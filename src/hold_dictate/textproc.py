@@ -147,10 +147,18 @@ def spoken_punctuation(text: str) -> str:
     return _tidy(changed) if changed != text else text
 
 
+# Whisper's own control tokens (<|he|>, <|en|>, <|nocaptions|>, <|0.00|>) that sometimes leak into a transcript.
+WHISPER_TOKEN = re.compile(r"\s*<\|[\w.]{1,16}\|>\s*")
+
+
+def drop_whisper_tokens(text: str) -> str:
+    return WHISPER_TOKEN.sub(lambda m: " " if m.start() and m.end() < len(text) else "", text)
+
+
 def clean(text: str, cfg, manual: bool = True) -> str:
     """The text to paste, or '' when there is nothing worth pasting. With manual=False the filler and spoken
     punctuation steps are skipped: a rewriter from an extension does them, better, from the meaning."""
-    text = text.strip()
+    text = drop_whisper_tokens(text).strip()
     if not text or (cfg.drop_hallucinations and is_hallucination(text)):
         return ""
     overrides = extensions.adjust_words(cfg.word_overrides, cfg)

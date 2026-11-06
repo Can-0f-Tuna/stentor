@@ -129,3 +129,10 @@ def test_coerce_checks_dicts():
         config.coerce("app_rules", ["slack"])
     with pytest.raises(ValueError):
         config.coerce("app_rules", {"slack": 1})
+
+
+def test_whisper_control_tokens_never_reach_the_text():
+    cfg = Config()
+    assert clean("כי בגלל ש<|he|> הם עושים", cfg) == "כי בגלל ש הם עושים"
+    assert clean("<|en|>hello <|0.00|>world<|nocaptions|>", cfg) == "hello world"
+    assert clean("<|he|>", cfg) == ""
