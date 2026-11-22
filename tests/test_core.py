@@ -188,8 +188,11 @@ def test_the_local_model_gets_a_thread_per_core(tmp_path, monkeypatch, cores, th
     from hold_dictate.providers import physical_cores
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setattr(os, "cpu_count", lambda: logical)
+    monkeypatch.setattr(os, "sched_getaffinity", lambda pid: set(range(logical)), raising=False)
     assert physical_cores(cpuinfo(tmp_path, cores, threads)) == expected
     assert physical_cores(str(tmp_path / "missing")) == logical // 2
+    monkeypatch.setattr(os, "sched_getaffinity", lambda pid: {0, 1, 2})  # `taskset`, or a container given three
+    assert physical_cores(cpuinfo(tmp_path, cores, threads)) == 3
 
 
 class FakeWhisper:

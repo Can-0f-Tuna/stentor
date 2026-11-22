@@ -176,7 +176,11 @@ def physical_cores(cpuinfo: str = "/proc/cpuinfo") -> int:
                 found = len({c for c in cores if c[1] is not None})
     except (OSError, ValueError, subprocess.SubprocessError):
         found = 0
-    return max(1, min(found, logical) if found else logical // 2)
+    try:
+        allowed = len(os.sched_getaffinity(0))  # a container or `taskset` may allow fewer than the computer has
+    except (AttributeError, OSError):  # macOS and Windows have no such limit to read
+        allowed = logical
+    return max(1, min(min(found, logical) if found else logical // 2, allowed))
 
 
 def model_cached(name: str) -> bool:
