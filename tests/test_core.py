@@ -121,7 +121,18 @@ def test_language_outside_the_list_is_transcribed_again(api, monkeypatch):
     monkeypatch.setattr(providers, "_request", lambda cfg, audio, lang, prompt, fmt: sent.append((lang, fmt)) or next(answers))
     cfg = config.Config(provider="groq", api_key="k", languages="he,en")
     assert transcribe_api(cfg, tone(0.5)) == "שלום"
-    assert sent == [("", "verbose_json"), ("he", "json")]
+    assert sent == [("", "verbose_json"), ("he", "verbose_json")]
+
+
+def test_the_language_check_works_for_any_whisper_service():
+    """An extension that transcribes somewhere else hands `checked` its own way of asking."""
+    from hold_dictate.providers import checked
+    cfg = config.Config(languages="he,en")
+    asked = []
+    replies = {"": ("Бдика", "russian", -0.6), "he": ("בדיקה", "hebrew", -0.2)}
+    assert checked(cfg, lambda language: asked.append(language) or replies[language]) == "בדיקה"
+    assert asked == ["", "he"]
+    assert checked(cfg, lambda language: ("Run it.", "english", -0.1)) == "Run it."
 
 
 def test_a_language_on_the_list_is_left_alone(monkeypatch):

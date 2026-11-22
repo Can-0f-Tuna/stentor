@@ -83,20 +83,25 @@ def detected_code(name: str) -> str:
     return next((code for code, full in LANGUAGE_NAMES.items() if full.lower() == name), "")
 
 
-def transcribe_api(cfg: Config, audio) -> str:
-    """Several languages: Whisper models report what they heard, and a language outside your list is
-    transcribed again in your first language (Hebrew misheard as Arabic or Yiddish, for example)."""
-    force, prompt = language_hints(cfg)
+def checked(cfg: Config, ask) -> str:
+    """Several languages picked: Whisper reports what it heard, and a language outside your list is transcribed
+    again in your first language (Hebrew misheard as Arabic, Russian or Yiddish, for example); extensions may
+    look again too. `ask(language)` gives (text, the language reported, its average avg_logprob or None), with
+    '' for auto-detect. Any Whisper service can use this, an extension's own included."""
     codes = cfg.language_codes()
-    verify = len(codes) > 1 and cfg.provider in ("groq", "openai") and "whisper" in cfg.effective_model()
-    text, heard, sure = _request(cfg, audio, force, prompt, "verbose_json" if verify else "json")
-    if not verify:
-        return text
+    text, heard, sure = ask("")
     code = detected_code(heard)
     if code not in ("", *codes):
-        return _request(cfg, audio, codes[0], prompt, "json")[0]
-    again = lambda language: _request(cfg, audio, language, prompt, "verbose_json")
-    return extensions.review_transcript(text, cfg, code, sure, again, passes=TranscribeError)
+        return ask(codes[0])[0]
+    return extensions.review_transcript(text, cfg, code, sure, ask, passes=TranscribeError)
+
+
+def transcribe_api(cfg: Config, audio) -> str:
+    force, prompt = language_hints(cfg)
+    verify = len(cfg.language_codes()) > 1 and cfg.provider in ("groq", "openai") and "whisper" in cfg.effective_model()
+    if not verify:
+        return _request(cfg, audio, force, prompt, "json")[0]
+    return checked(cfg, lambda language: _request(cfg, audio, language, prompt, "verbose_json"))
 
 
 def _request(cfg: Config, audio, language: str, prompt: str, response_format: str) -> tuple[str, str, float | None]:
