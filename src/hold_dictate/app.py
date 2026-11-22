@@ -274,7 +274,7 @@ class Dictation:
             self._fail(e)
             return
         self.last_used = time.monotonic()
-        print(f"typed live, the end took {self.last_used - started:.1f}s: {text!r}", flush=True)
+        print(f"typed live, the end took {self.last_used - started:.1f}s: {len(text)} characters", flush=True)  # never the text: this goes to the system log
         if text:
             self.last_text, self.last_app = text, app
         if live.note:
@@ -313,7 +313,8 @@ class Dictation:
         self.last_used = time.monotonic()
         rewrite = extensions.rewriter(self)
         text = textproc.clean(raw, self.cfg, manual=rewrite is None)
-        print(f"transcribed ({source}) in {self.last_used - started:.1f}s: {raw!r}" + (f" -> {text!r}" if text != raw.strip() else ""), flush=True)
+        # never the text: this goes to the system log, and the history is where dictations are kept
+        print(f"transcribed ({source}) in {self.last_used - started:.1f}s: {len(raw.strip())} characters" + (f", {len(text)} after clean-up" if text != raw.strip() else ""), flush=True)
         if not text:
             self.fb.done()
             return

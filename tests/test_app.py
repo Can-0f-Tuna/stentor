@@ -145,6 +145,15 @@ def test_auto_mode_tap_starts_and_next_tap_stops(api):
     assert d.recorder is None and [c["text"] for c in out.calls] == ["hello world"]
 
 
+def test_the_log_never_holds_what_was_said(api, capsys):
+    d, out, _ = dictation(cfg_for(api))
+    tap(d, 0.5)
+    settle(d)
+    printed = capsys.readouterr()
+    assert [c["text"] for c in out.calls] == ["hello world"]
+    assert "transcribed" in printed.out and "hello" not in printed.out + printed.err
+
+
 def test_auto_mode_long_hold_works_like_hold(api):
     d, out, _ = dictation(cfg_for(api, hotkey_mode="auto"))
     tap(d, 0.5)

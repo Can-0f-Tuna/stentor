@@ -197,6 +197,14 @@ def test_a_key_belongs_to_its_service(server):
     assert state["key_hint"] == "…2345"
 
 
+def test_the_page_knows_which_service_the_saved_key_is_for(server):
+    """Back from This computer to Your own key, the page returns to the service whose key is saved."""
+    _, state = call(server, "/api/config", {"api_key": "gsk_newkey12345"})
+    assert state["key_service"] == "groq"
+    _, state = call(server, "/api/config", {"provider": "local"})
+    assert state["key_service"] == "groq" and state["config"]["provider"] == "local"
+
+
 def test_old_configs_keep_their_key(tmp_path):
     p = tmp_path / "c.toml"
     p.write_text('provider = "openai"\napi_key = "sk-old"\n')

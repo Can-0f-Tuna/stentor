@@ -265,9 +265,15 @@ details .items { margin-top:var(--s-6); }
 </section>
 
 <section class="group" aria-labelledby="h-service">
-  <header><h2 id="h-service">Transcription</h2><p>The service that turns your speech into text.</p></header>
+  <header><h2 id="h-service">Transcription</h2><p>Where your speech is turned into text.</p></header>
   <div class="items">
     <div class="item">
+      <span class="label" id="l-where">Where</span>
+      <div><div class="seg" id="where" role="group" aria-labelledby="l-where"></div></div>
+      <p class="hint" id="whereHint"></p>
+    </div>
+    <div class="item" id="whereBox" hidden></div>
+    <div class="item" id="providerRow">
       <span class="label" id="l-provider">Service</span>
       <div><div class="seg" id="provider" role="group" aria-labelledby="l-provider"></div></div>
     </div>
@@ -470,7 +476,10 @@ async function api(path, body) {
   return data;
 }
 // Where an extension joins in, from the script it adds to this page.
-const pageHooks = { blockers: [], renders: [], starts: [] }; // blockers: s => a blocker or null; renders: s => draw; starts: () => run once
+const pageHooks = { blockers: [], renders: [], starts: [], places: [] }; // blockers: s => a blocker or null; renders: s => draw; starts: () => run once
+// places: more answers to "Where" in Transcription, before the two built in. Each is { id, label, hint, shown(s), on(s), pick(s), leave(), panel }:
+// on(s) says it transcribes now; pick(s) and leave() give the settings to save when it is chosen or left (pick may give null to save nothing);
+// panel is an element shown under the choice while it is on.
 const hook = (list, ...args) => { for (const f of list) try { const r = f(...args); if (r) return r; } catch (e) { console.error(e); } };
 const homes = Object.fromEntries(['keyRows', 'customRows', 'startSvc'].map(id => [id, { parent: $(id).parentNode, next: $(id).nextElementSibling }]));
 
@@ -540,11 +549,12 @@ function blocker(s) {
     const text = first.replace(/^cannot read the keyboard\.\s*/i, '');
     return { title: keyboard ? 'hold-dictate can\'t read the keyboard yet.' : 'The shortcut can\'t work yet.', lede: text[0].toUpperCase() + text.slice(1) + (cmd && !text.endsWith(':') ? ' Run this in a terminal:' : ''), code: cmd || undefined };
   }
+  if (s.extension_transcribes) return null; // an extension takes the dictations, so no key or engine is needed
   if (c.provider === 'local') return s.local_installed ? null : s.offline.can_install
     ? { title: 'Install the offline engine to start.', lede: 'It runs on this computer without internet. Run this in a terminal, then reload this page:', code: s.offline.command }
     : { title: 'Install the offline engine to start.', lede: 'It runs on this computer without internet. It is a large download, a few hundred MB, and hold-dictate restarts when it is done.', button: offline.box };
   if (c.provider === 'custom' && !c.base_url) return { title: 'Add your server\'s address to start.', lede: 'A custom service needs the address of any server that speaks the OpenAI transcription API.', move: 'customRows' };
-  if (!s.key_hint && !s.key_from_env && !s.extension_transcribes) return { title: 'Paste an API key to start dictating.', lede: `hold-dictate sends what you say to a speech service, which turns it into text. You're set up for ${service}${c.provider === 'groq' ? ', which is free' : ''}. You can pick another service below.`, move: 'keyRows' };
+  if (!s.key_hint && !s.key_from_env) return { title: 'Paste an API key to start dictating.', lede: `hold-dictate sends what you say to a speech service, which turns it into text. You're set up for ${service}${c.provider === 'groq' ? ', which is free' : ''}. You can pick another service below.`, move: 'keyRows' };
   return null;
 }
 
@@ -623,18 +633,46 @@ function keepFocus(box, build) {
 
 // ---- transcription service ----
 function renderService(s) {
-  const c = s.config, prov = $('provider');
-  keepFocus(prov, () => { prov.innerHTML = '';
-  for (const [k, label] of [...Object.entries(s.providers).map(([k, v]) => [k, v.label.replace(/ \(.*/, '')]), ['local', 'Offline']]) {
+  const c = s.config, prov = $('provider'), seg = $('where');
+  // One answer to "where": an extension's place, a speech service you have a key for, or this computer.
+  const added = pageHooks.places.filter(p => !p.shown || p.shown(s)), place = added.find(p => p.on(s));
+  const now = place ? place.id : c.provider === 'local' ? 'local' : 'key';
+  const leaving = () => Object.assign({}, ...added.filter(p => p.on(s)).map(p => p.leave()));
+  const clearKey = () => { $('key').value = ''; $('keyMsg').className = 'note'; $('keyMsg').textContent = ''; };
+  const builtIn = [
+    { id: 'key', label: 'Your own key', hint: 'Your recordings go straight to a speech service you have a key for. Groq\'s is free.',
+      pick: () => ({ provider: c.provider !== 'local' ? c.provider : s.key_service || 'groq' }) },
+    { id: 'local', label: 'This computer', hint: 'Nothing leaves this computer and it works without internet. Slower, and a large download.',
+      pick: () => ({ provider: 'local' }) },
+  ];
+  keepFocus(seg, () => { seg.innerHTML = '';
+  for (const p of [...added, ...builtIn]) {
     const b = document.createElement('button');
-    b.type = 'button'; b.dataset.k = k; b.textContent = label; b.setAttribute('aria-pressed', String(c.provider === k));
-    b.onclick = () => { if (c.provider === k) return; $('key').value = ''; $('keyMsg').className = 'note'; $('keyMsg').textContent = ''; save({ provider: k, ...(k === 'groq' || k === 'openai' ? { model: '' } : {}) }); };
+    b.type = 'button'; b.dataset.k = p.id; b.textContent = p.label; b.setAttribute('aria-pressed', String(now === p.id));
+    b.onclick = () => {
+      if (now === p.id) return;
+      const changes = p.pick(s);
+      if (!changes) return;
+      clearKey(); save(builtIn.includes(p) ? { ...leaving(), ...changes } : changes);
+    };
+    seg.append(b);
+  } });
+  $('whereHint').textContent = ([...added, ...builtIn].find(p => p.id === now) || {}).hint || '';
+  const box = $('whereBox');
+  box.hidden = !(place && place.panel);
+  if (place && place.panel && place.panel.parentNode !== box) box.replaceChildren(place.panel);
+  keepFocus(prov, () => { prov.innerHTML = '';
+  for (const [k, v] of Object.entries(s.providers)) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.k = k; b.textContent = v.label.replace(/ \(.*/, ''); b.setAttribute('aria-pressed', String(c.provider === k));
+    b.onclick = () => { if (c.provider === k) return; clearKey(); save({ provider: k, ...(k === 'groq' || k === 'openai' ? { model: '' } : {}) }); };
     prov.append(b);
   } });
   const local = c.provider === 'local', p = s.providers[c.provider];
-  $('keyRows').hidden = local;
-  $('customRows').hidden = c.provider !== 'custom';
-  $('localHelp').hidden = !local || !s.local_installed; // when it is missing, the hero shows the install command
+  $('providerRow').hidden = now !== 'key';
+  $('keyRows').hidden = now !== 'key' && (blocker(s) || {}).move !== 'keyRows';
+  $('customRows').hidden = now !== 'key' || c.provider !== 'custom';
+  $('localHelp').hidden = now !== 'local' || !s.local_installed; // when it is missing, the hero shows the install command
   $('localHelp').innerHTML = '';
   $('localHelp').append(s.local_installed ? 'Runs on this computer without internet. The first use downloads the model.' : 'The offline engine needs one more install. In a terminal, run ', ...(s.local_installed ? [] : [Object.assign(document.createElement('code'), { textContent: s.offline.command })]));
   $('saveKey').classList.toggle('primary', (blocker(s) || {}).move === 'keyRows');
@@ -650,8 +688,9 @@ function renderService(s) {
 let modelOpen = null; // null until the first render, then the user's choice
 function renderModel(s) {
   const c = s.config, local = c.provider === 'local';
-  $('modelRow').hidden = c.provider === 'custom'; // a custom server takes a typed model name above
-  if (c.provider === 'custom') return;
+  // a custom server takes a typed model name above; an extension's place picks its own model
+  $('modelRow').hidden = c.provider === 'custom' || pageHooks.places.some(p => (!p.shown || p.shown(s)) && p.on(s));
+  if ($('modelRow').hidden) return;
   const list = local ? s.local_models : s.providers[c.provider].models;
   const best = list[0][0], value = local ? c.local_model : c.model;
   const auto = local ? value === best : !value;

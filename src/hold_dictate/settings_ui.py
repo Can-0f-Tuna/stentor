@@ -140,6 +140,7 @@ class SettingsServer:
             "key_hint": f"…{key[-4:]}" if len(key) >= 8 else ("set" if key else ""),
             "key_from_env": bool(cfg.effective_key()) and not key,
             "extension_transcribes": extensions.transcribes(cfg),  # dictation works without a key
+            "key_service": cfg.api_key_service if cfg.api_key and cfg.api_key_service in PROVIDERS else "",  # the service the saved key is for
             "providers": {k: {"label": v["label"], "keys_url": v["keys_url"], "model": v["model"], "models": v["models"]} for k, v in PROVIDERS.items()},
             "local_models": LOCAL_MODELS,
             "languages": [[code, name] for code, name, _ in LANGUAGES],
