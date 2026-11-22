@@ -76,6 +76,7 @@ class Dictation:
         self.local.on_download = self._downloading
         self.recorder_factory = recorder_factory or audio.Recorder
         self.paster = paster or paste.paste_text
+        self.portal_detector = None
         self.focus = focus or paste.focused_app
         self.copier = copier or paste.copy_text
         self.second_work = None  # what takes a recording made with the second hotkey; None for a dictation
@@ -102,7 +103,16 @@ class Dictation:
         which, _, action = action.rpartition(":")
         with self.lock:
             mode = self.cfg.hotkey_mode
-            if action == "start":
+            if action == "cancel":
+                if self.recorder is not None:
+                    if self.live:
+                        self.live.stop()
+                    recorder = self.recorder
+                    self.recorder, self.live, self.latched = None, None, False
+                    self.ducker.restore()
+                    recorder.stop()
+                    self.fb.done()
+            elif action == "start":
                 if self.recorder is None:
                     work = extensions.second_recording(self) if which == "second" else None
                     if work is False:
@@ -176,11 +186,23 @@ class Dictation:
                     text = self._spaced(text, app)
                 return self._type_live(text, app)
             self.live = LiveTyper(self.recorder, self._transcribe_live, lambda raw: textproc.clean(raw, self.cfg), type_live,
-                                  ready=lambda: sys.platform.startswith("linux") or self.latched,
+                                  ready=self._live_ready,
                                   **({"gap": 1.0, "per_minute": 0, "at_pauses": True} if self.cfg.provider == "local" and not extensions.transcribes(self.cfg) else {}))
             self.live.start()
         if self.cfg.hotkey_mode != "hold" and self.cfg.silence_stop > 0:
             threading.Thread(target=self._watch_silence, args=(self.recorder,), daemon=True).start()
+
+    def _live_ready(self) -> bool:
+        detector = self.portal_detector
+        if detector is not None:
+            return detector.portal_paste_ready()
+        return sys.platform.startswith("linux") or self.latched
+
+    def _portal_paste(self, text: str, **kwargs) -> str:
+        detector = self.portal_detector
+        if detector is not None and not detector.wait_released(2.0):
+            return self.copier(text) or "Text copied. Release the shortcut and paste it yourself."
+        return paste.paste_text(text, **kwargs)
 
     def _cue_when_live(self, recorder):
         """The pill and the start sound mean "speak now", so they wait for the mic: words said into a Bluetooth
@@ -302,6 +324,9 @@ class Dictation:
         self.fb.clear_problem()
         rule = paste.rule_for(self.cfg.app_rules, app)
         submitted = rule == "submit" or (self.cfg.auto_submit and rule != "paste")
+        detector = self.portal_detector
+        if submitted and detector is not None and not detector.wait_released(2.0):
+            submitted = False
         if submitted:
             paste.press_enter()
         self._followed(app, text, submitted)
@@ -424,6 +449,7 @@ class Dictation:
 def run(cfg: Config) -> int:
     from . import tray
     from .settings_ui import SettingsServer, running_url
+    from .portal_hotkey import PortalBackend, PortalUnavailable
     from .updater import Updater
 
     if running_url():
@@ -444,6 +470,9 @@ def run(cfg: Config) -> int:
     feedback = Feedback(cfg)
     detector = HoldDetector(hotkey, extensions.second_hotkey(cfg, hotkey))
     dictation = Dictation(cfg, feedback)
+    if isinstance(backend, PortalBackend):
+        dictation.portal_detector = detector
+        dictation.paster = dictation._portal_paste
     updater = Updater(cfg, notify=feedback.notify, is_idle=dictation.idle)
     feedback.pending_update = lambda: updater.latest if updater.available() and not updater.ready else ""
     updater.on_failed = feedback.update_failed
@@ -453,13 +482,19 @@ def run(cfg: Config) -> int:
         if new_cfg.provider == "local" and dictation.local.loaded != new_cfg.local_model and not extensions.transcribes(new_cfg):
             dictation.local.preload()
         new_hotkey = parse_hotkey(new_cfg.hotkey)
-        server.hotkey_problem = ""  # a saved shortcut is always a valid one
-        if str(new_hotkey) != str(detector.hotkey) and (detector.set_hotkey(new_hotkey) or dictation.latched):
-            dictation.finish()
+        if not portal_notice:
+            server.hotkey_problem = ""  # a saved shortcut is always a valid one
+        if str(new_hotkey) != str(detector.hotkey):
+            stopped = detector.set_hotkey(new_hotkey)
+            if dictation.portal_detector is None and (stopped or dictation.latched):
+                dictation.finish()
         new_second = extensions.second_hotkey(new_cfg, new_hotkey)
-        if str(new_second) != str(detector.second) and (detector.set_second_hotkey(new_second) or (dictation.latched and dictation.second_work)):
-            dictation.finish()
+        if str(new_second) != str(detector.second):
+            stopped = detector.set_second_hotkey(new_second)
+            if dictation.portal_detector is None and (stopped or (dictation.latched and dictation.second_work)):
+                dictation.finish()
 
+    portal_notice = ""
     server = SettingsServer(cfg, on_saved=on_saved, updater=updater, session=dictation).start()
     server.problem, server.hotkey_problem = problem, hotkey_problem
     dictation.on_no_key = server.open
@@ -484,6 +519,24 @@ def run(cfg: Config) -> int:
     lost = threading.Event()  # the keyboard listener ended by itself
 
     def listen():
+        nonlocal backend, portal_notice
+
+        def portal_problem(text):
+            nonlocal portal_notice
+            portal_notice = server.hotkey_problem = text
+            if text:
+                print(f"hold-dictate: {text}", file=sys.stderr, flush=True)
+
+        if isinstance(backend, PortalBackend):
+            backend.on_problem = portal_problem
+            try:
+                backend.run(detector, dictation.on_action, tick, stop=done, mode=lambda: cfg.hotkey_mode)
+                return
+            except PortalUnavailable as e:
+                dictation.portal_detector = None
+                backend, fallback_problem = choose_backend(skip_portal=True)
+                server.problem = fallback_problem
+                portal_problem(f"{e} Using the {backend.name} keyboard backend." if backend else str(e))
         if backend is None:
             while not done.wait(5):
                 tick()
@@ -500,10 +553,10 @@ def run(cfg: Config) -> int:
 
     done = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: done.set())  # a clean exit, so other apps get their volume back
-    threading.Thread(target=listen, daemon=True).start()
     if backend:
         print(f"hold-dictate: {'hold' if cfg.hotkey_mode == 'hold' else 'tap'} {hotkey} to dictate ({cfg.provider}, keyboard via {backend.name})", flush=True)
     print(f"hold-dictate: settings at {server.url}", flush=True)
+    threading.Thread(target=listen, daemon=True).start()
     try:
         if tray.available():
             try:

@@ -1,6 +1,7 @@
 """Hold-to-talk hotkey detection.
 
-HoldDetector is pure logic (fed key up/down events by name). Backends supply the events:
+HoldDetector accepts raw key events or whole-shortcut events. Backends supply the events:
+  - PortalBackend uses the desktop's GlobalShortcuts portal on Wayland.
   - EvdevBackend reads /dev/input directly: works on Wayland and X11, needs the `input` group.
   - PynputBackend uses the OS keyboard hooks on Windows and macOS (and Linux X11).
 """
@@ -13,6 +14,7 @@ import threading
 import time
 
 MODIFIERS = ("alt", "ctrl", "shift", "super")
+PORTAL_RELEASE_SETTLE = 0.25  # the desktop may report the chord up before its physical modifiers
 ALIASES = {
     "option": "alt", "opt": "alt", "control": "ctrl", "cmd": "super", "command": "super",
     "win": "super", "windows": "super", "meta": "super",
@@ -58,6 +60,10 @@ class HoldDetector:
         self.down: dict[str, set] = {}  # name -> physical key ids currently held
         self.active = False
         self.which = ""  # "" for the dictation hotkey, "second" for the second hotkey, while active
+        self._portal_keys: dict[str, Hotkey | None] = {}
+        self._portal_down: set[str] = set()
+        self._settled_at = 0.0
+        self._portal_state = threading.Condition()
 
     def hotkeys(self) -> list:
         return [h for h in (self.hotkey, self.second) if h is not None]
@@ -79,17 +85,75 @@ class HoldDetector:
         return action
 
     def is_down(self, name: str) -> bool:
-        return bool(self.down.get(name))
+        with self._portal_state:
+            return bool(self.down.get(name)) or any(
+                hotkey is not None and (name == hotkey.key or name in hotkey.mods)
+                for shortcut in self._portal_down
+                for hotkey in (self._portal_keys[shortcut],)
+            )
 
     def modifiers_held(self) -> bool:
+        with self._portal_state:
+            if self._portal_down:
+                return self._portal_modifiers_held()
         return any(self.is_down(m) for m in self.hotkey.mods)
 
     def any_modifier_held(self) -> bool:
+        with self._portal_state:
+            if self._portal_modifiers_held():
+                return True
         return any(self.is_down(m) for m in MODIFIERS)
 
+    def _portal_modifiers_held(self) -> bool:
+        # An opaque desktop description gives us no way to rule out modifiers.
+        return any(hotkey is None or hotkey.mods for shortcut in self._portal_down
+                   for hotkey in (self._portal_keys[shortcut],))
+
+    def set_portal_shortcuts(self, shortcuts: dict[str, Hotkey | None]):
+        with self._portal_state:
+            if self._portal_down:
+                self._settled_at = time.monotonic() + PORTAL_RELEASE_SETTLE
+            self._portal_keys = shortcuts
+            self._portal_down.clear()
+            self.active = False
+            self._portal_state.notify_all()
+
+    def feed_shortcut(self, shortcut: str, pressed: bool) -> str | None:
+        """Use the desktop's binding decision. Two overlapping shortcuts still start only one recording."""
+        with self._portal_state:
+            if shortcut not in self._portal_keys:
+                return None
+            which = "" if shortcut == "dictation" else "second"
+            if pressed:
+                if shortcut in self._portal_down:
+                    return None
+                self._portal_down.add(shortcut)
+                if self.active:
+                    return None
+                self.active, self.which = True, which
+                return "second:start" if which else "start"
+            if shortcut not in self._portal_down:
+                return None
+            self._portal_down.remove(shortcut)
+            # A portal release can precede the release of the physical modifiers.
+            self._settled_at = time.monotonic() + PORTAL_RELEASE_SETTLE
+            self._portal_state.notify_all()
+            return self._stop_if(which)
+
+    def portal_paste_ready(self) -> bool:
+        with self._portal_state:
+            return not self._portal_down and time.monotonic() >= self._settled_at
+
     def wait_released(self, seconds: float = 1.0) -> bool:
-        """Waits until no modifier is held (the backend thread feeds the events). True if they all are up."""
+        """Waits for raw modifiers or for the desktop shortcut to release and settle."""
         deadline = time.monotonic() + seconds
+        with self._portal_state:
+            while not self.portal_paste_ready():
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return False
+                delay = left if self._portal_down else self._settled_at - time.monotonic()
+                self._portal_state.wait(min(left, delay))
         while self.any_modifier_held():
             if time.monotonic() >= deadline:
                 return False
@@ -392,18 +456,40 @@ def _mac_check_tap(listener):
         pass
 
 
-def choose_backend(quick: bool = False):
-    """Returns (backend or None, problem text). quick, for doctor: pynput is looked for, not imported."""
+def choose_backend(quick: bool = False, *, skip_portal: bool = False):
+    """Returns (backend or None, problem text). The doctor probe doesn't request a shortcut.
+
+    On Linux the keyboard itself comes first where it can be read: it works on every desktop and it sees the real
+    press and release. The desktop's shortcut portal is for a Wayland session without that access, such as before
+    the first log-out after the install. HOLD_DICTATE_HOTKEY_BACKEND (auto, evdev, portal, pynput) picks one."""
     if sys.platform.startswith("linux"):
-        evdev = EvdevBackend()
-        if evdev.usable():
-            return evdev, ""
-        pynput_ok = bool(os.environ.get("DISPLAY")) and not os.environ.get("WAYLAND_DISPLAY")
-        if pynput_ok and PynputBackend().usable(quick):
-            return PynputBackend(), ""
+        forced = os.environ.get("HOLD_DICTATE_HOTKEY_BACKEND", "auto").strip().lower() or "auto"
+        if forced not in ("auto", "portal", "evdev", "pynput"):
+            return None, "Set HOLD_DICTATE_HOTKEY_BACKEND to auto, portal, evdev or pynput."
+        if forced in ("auto", "evdev"):
+            backend = EvdevBackend()
+            if backend.usable():
+                return backend, ""
+        wayland = bool(os.environ.get("WAYLAND_DISPLAY")) or os.environ.get("XDG_SESSION_TYPE") == "wayland"
+        portal_problem = ""
+        if not skip_portal and (forced == "portal" or (forced == "auto" and wayland)):
+            from .portal_hotkey import PortalBackend
+            backend = PortalBackend()
+            portal_problem = backend.probe()
+            if not portal_problem:
+                return backend, ""
+        if forced == "portal":
+            return None, portal_problem
+        if forced == "pynput" or (forced == "auto" and os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")):
+            backend = PynputBackend()
+            if backend.usable(quick):
+                return backend, ""
+            if forced == "pynput":
+                return None, "The pynput keyboard backend needs a working X11 display and hold-dictate[x11]."
         return None, (
             "cannot read the keyboard. Add your user to the 'input' group, then log out and back in:\n"
-            "    sudo usermod -aG input $USER"
+            "    sudo usermod -aG input $USER\n"
+            "Or bind a key in your desktop's keyboard settings to `hold-dictate dictation toggle`."
         )
     backend = PynputBackend()
     if backend.usable(quick):

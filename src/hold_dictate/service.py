@@ -41,6 +41,24 @@ def _write_linux_desktop():
     )
 
 
+def ensure_portal_desktop_entry():
+    """Host-portal registration needs a desktop entry even for a run from the terminal."""
+    entry = _linux_desktop().with_name(f"{LABEL}.desktop")
+    system_dirs = (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":")
+    if any((Path(data) / "applications" / entry.name).is_file() for data in system_dirs if data):
+        return
+    entry.parent.mkdir(parents=True, exist_ok=True)
+    python = sys.executable.replace("\\", "\\\\\\\\").replace("%", "%%")
+    for char in ('"', '`', '$'):
+        python = python.replace(char, "\\\\" + char)
+    try:
+        with entry.open("x", encoding="utf-8") as file:
+            file.write("[Desktop Entry]\nType=Application\nName=hold-dictate\nNoDisplay=true\n"
+                       f'Exec="{python}" -m hold_dictate settings\nIcon=audio-input-microphone\n')
+    except FileExistsError:
+        pass
+
+
 def _mac_plist() -> Path:
     return Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
 

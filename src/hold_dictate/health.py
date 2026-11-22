@@ -99,7 +99,10 @@ def checks(cfg, online: bool = True) -> list:
     except ValueError as e:
         line(False, f"hotkey: {e}", "Choose a new shortcut at the top of the settings page, or fix `hotkey` in the config file.")
     backend, problem = choose_backend(quick=True)
-    line(backend is not None, f"keyboard access ({backend.name if backend else 'none'})", problem)
+    keyboard = "portal available, approval checked when running" if backend and backend.name == "portal" else (
+        backend.name if backend else "none"
+    )
+    line(backend is not None, f"keyboard access ({keyboard})", problem)
     if sys.platform == "darwin":
         _mac_rows(line)
     try:
