@@ -158,28 +158,58 @@ class EvdevBackend:
 
     def __init__(self, devices=None):
         self.devices, self.unreadable = [], []
+        self.paths = {}  # open device -> its path, for the keyboards found on this computer
+        self.watch = devices is None  # keyboards come and go (Bluetooth, USB): look again while running
         if devices is not None:  # tests pass file objects
             self.devices = devices
             return
+        self.rescan()
+
+    def rescan(self):
+        """Opens the keyboards that aren't open yet: at the start, and one that was plugged in or came back."""
+        self.unreadable = []
         for path in keyboard_devices():
+            if path in self.paths.values():
+                continue
             try:
-                self.devices.append(open(path, "rb", buffering=0))
+                dev = open(path, "rb", buffering=0)
             except PermissionError:
                 self.unreadable.append(path)
+            except OSError:
+                continue  # it left again between the listing and the open
+            else:
+                self.devices.append(dev)
+                self.paths[dev] = path
+
+    def _drop(self, dev):
+        self.devices.remove(dev)
+        self.paths.pop(dev, None)
+        try:
+            dev.close()
+        except OSError:
+            pass
 
     def usable(self) -> bool:
         return bool(self.devices)
 
     def run(self, detector: HoldDetector, on_action, on_tick=None, tick_seconds: float = 5.0):
-        while self.devices:
-            ready, _, _ = select.select(self.devices, [], [], tick_seconds if on_tick else None)
+        scanned = time.monotonic()
+        while self.devices or self.watch:
+            ready, _, _ = select.select(self.devices, [], [], tick_seconds if on_tick or self.watch else None)
+            if self.watch and time.monotonic() - scanned >= tick_seconds:  # not at every key: it reads a file
+                scanned = time.monotonic()
+                self.rescan()
             if not ready:
-                on_tick()
+                if on_tick:
+                    on_tick()
                 continue
             for dev in ready:
-                raw = dev.read(EV_SIZE)
+                try:
+                    raw = dev.read(EV_SIZE)
+                except OSError:  # ENODEV: a headset or keyboard turned off; the others go on, and it is reopened when it returns
+                    raw = b""
                 if len(raw) < EV_SIZE:  # device went away (or a test pipe closed)
-                    self.devices.remove(dev)
+                    self._drop(dev) if dev in self.paths else self.devices.remove(dev)
                     continue
                 _, _, ev_type, code, value = struct.unpack(EV_FORMAT, raw)
                 name = CODE_TO_NAME.get(code)

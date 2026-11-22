@@ -60,6 +60,43 @@ def test_evdev_backend_reads_events():
     assert actions == ["start", "stop"]
 
 
+def test_a_keyboard_that_disappears_leaves_the_others_working():
+    """A Bluetooth headset turning off made read() raise ENODEV, and the hotkey died with it (#1)."""
+    class Gone:
+        def __init__(self, r):
+            self.r = r
+
+        def fileno(self):
+            return self.r
+
+        def read(self, n):
+            raise OSError(19, "No such device")
+
+    gone_r, gone_w = os.pipe()
+    os.write(gone_w, b"x")  # readable, so select() hands it to the loop
+    r, w = os.pipe()
+    os.write(w, b"".join(_event(c, v) for c, v in [(ALT, 1), (SPACE, 1), (SPACE, 0), (ALT, 0)]))
+    os.close(w)
+    actions = []
+    EvdevBackend([Gone(gone_r), os.fdopen(r, "rb", buffering=0)]).run(HoldDetector(parse_hotkey("alt+space")), actions.append)
+    assert actions == ["start", "stop"]
+    os.close(gone_r), os.close(gone_w)
+
+
+def test_a_keyboard_that_comes_back_is_opened_again(tmp_path, monkeypatch):
+    device = tmp_path / "event7"
+    device.write_bytes(b"")
+    listed = [str(device)]
+    monkeypatch.setattr("hold_dictate.hotkey.keyboard_devices", lambda: list(listed))
+    backend = EvdevBackend()
+    first = backend.devices[0]
+    backend._drop(first)
+    assert backend.devices == [] and first.closed
+    backend.rescan()
+    backend.rescan()  # looking twice opens it once
+    assert [backend.paths[d] for d in backend.devices] == [str(device)]
+
+
 def test_two_hotkeys_the_more_specific_wins():
     d = HoldDetector(parse_hotkey("alt+space"), parse_hotkey("alt+shift+space"))
     d.feed("alt", 56, True)
