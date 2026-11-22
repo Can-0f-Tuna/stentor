@@ -143,8 +143,8 @@ class Dictation:
                 self.on_no_key()
             return
         self._cut_tail()
-        if self.cfg.provider == "local" and self.local.model is None:
-            self.local.preload()  # freed while idle: it loads while you speak
+        if self.cfg.provider == "local" and self.local.model is None and not extensions.transcribes(self.cfg):
+            self.local.preload()  # freed while idle: it loads while you speak. Not while an extension transcribes: then it is only the fallback
         self.voice = audio.VoiceMeter()
         try:
             self.recorder = self.recorder_factory(self._level)
@@ -438,7 +438,7 @@ def run(cfg: Config) -> int:
     updater.announce = not feedback.events  # the pill ticks instead
 
     def on_saved(new_cfg: Config):
-        if new_cfg.provider == "local" and dictation.local.loaded != new_cfg.local_model:
+        if new_cfg.provider == "local" and dictation.local.loaded != new_cfg.local_model and not extensions.transcribes(new_cfg):
             dictation.local.preload()
         new_hotkey = parse_hotkey(new_cfg.hotkey)
         server.hotkey_problem = ""  # a saved shortcut is always a valid one
@@ -452,7 +452,7 @@ def run(cfg: Config) -> int:
     server.problem, server.hotkey_problem = problem, hotkey_problem
     dictation.on_no_key = server.open
     extensions.started(dictation, server, detector)
-    if cfg.provider == "local":
+    if cfg.provider == "local" and not extensions.transcribes(cfg):
         dictation.local.preload()  # after the extensions, which may pick the model; the first dictation shouldn't wait
     if sys.platform == "darwin":
         from . import macos
