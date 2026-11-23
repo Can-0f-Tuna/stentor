@@ -34,7 +34,9 @@ Write-Host "==> Starting Stentor (it also starts at every login; look for its ic
 stentor service install
 # An install from when this was called hold-dictate. `service install` has just taken its start-at-login entry
 # away; its tool goes too, so the old command is not left behind. Its settings were copied.
-if (Test-Path (Join-Path (& uv tool dir) "hold-dictate")) { uv tool uninstall hold-dictate 2>$null | Out-Null }
+try {  # with "Stop", Windows PowerShell turns a native command's error output into an exception
+    if (Test-Path (Join-Path (& uv tool dir) "hold-dictate")) { uv tool uninstall hold-dictate *> $null }
+} catch { }
 if (-not $env:STENTOR_NO_SETUP) {
     Write-Host "==> Opening the settings in your browser. Add your API key there."
     stentor settings --wait 10

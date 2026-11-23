@@ -4,6 +4,8 @@ Linux has no tray here (Wayland trays need extra system libraries); it gets an a
 """
 import sys
 
+from . import mark
+
 
 def available() -> bool:
     if sys.platform not in ("win32", "darwin"):
@@ -14,19 +16,6 @@ def available() -> bool:
         return True
     except Exception:
         return False
-
-
-def _icon_image():
-    """A dark rounded square with five white voice bars, drawn at runtime so no image file is needed."""
-    from PIL import Image, ImageDraw
-    size = 64
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.rounded_rectangle((2, 2, size - 3, size - 3), radius=14, fill=(23, 23, 23, 255))
-    for i, h in enumerate((14, 26, 38, 26, 14)):
-        x = 14 + i * 9
-        draw.rounded_rectangle((x, (size - h) // 2, x + 5, (size + h) // 2), radius=2, fill=(255, 255, 255, 255))
-    return img
 
 
 class Tray:
@@ -40,7 +29,7 @@ class Tray:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit Stentor", self._quit),
         )
-        self.icon = pystray.Icon("stentor", _icon_image(), "stentor", menu)
+        self.icon = pystray.Icon("stentor", mark.image(), "Stentor", menu)
 
     def _quit(self):
         self.icon.stop()

@@ -137,3 +137,10 @@ def test_windows_install_swaps_the_run_value(ran, monkeypatch):
     assert ("taskkill", "/F", "/IM", "pythonw.exe", "/FI", "WINDOWTITLE eq hold-dictate*") in ran
     service.uninstall()
     assert values == {}
+
+
+def test_the_mark_is_drawn_for_the_tray_and_for_a_page():
+    from stentor import mark, settings_ui
+    assert mark.svg(22).startswith('<svg width="22"') and mark.svg(22) in settings_ui.STALE_PAGE.decode()
+    image = pytest.importorskip("PIL.Image") and mark.image(64)
+    assert image.size == (64, 64) and image.getpixel((0, 0))[3] == 0 and image.getpixel((30, 34))[3] == 255  # clear corner, solid helmet

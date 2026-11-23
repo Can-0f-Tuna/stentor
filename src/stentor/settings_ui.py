@@ -15,7 +15,7 @@ from dataclasses import asdict, fields
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, config as cfgmod, ducking, extensions, health, history, textproc
+from . import __version__, config as cfgmod, ducking, extensions, health, history, mark, textproc
 from .config import APP_RULES, DUCK_MODES, HISTORY_DAYS, HOTKEY_MODES, LANGUAGES, LOCAL_MODELS, OFFLINE_COMMAND, OVERLAY_STYLES, PROVIDERS, Config
 
 PAGE = Path(__file__).with_name("settings.html")
@@ -33,7 +33,7 @@ h1 {{ margin:0 0 12px; font-size:32px; font-weight:600; letter-spacing:-.02em; l
 p {{ margin:0; color:var(--muted); font-size:17px; }}
 code {{ font:500 .9em ui-monospace,Menlo,Consolas,monospace; background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:1px 5px; color:var(--ink); }}
 </style>
-<main><div class="brand"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="#000"/><rect x="3.5" y="2.5" width="25" height="23" rx="6" fill="#232326"/><g fill="#fff"><rect x="8" y="12" width="2.6" height="4" rx="1.3"/><rect x="12.4" y="9" width="2.6" height="10" rx="1.3"/><rect x="16.8" y="6.5" width="2.6" height="15" rx="1.3" fill="#5b74ff"/><rect x="21.2" y="10.5" width="2.6" height="7" rx="1.3"/></g></svg>Stentor</div>
+<main><div class="brand">{mark.svg(22)}Stentor</div>
 <h1>This settings link has expired.</h1>
 <p>Open the settings again {REOPEN.get("linux" if sys.platform.startswith("linux") else sys.platform, "from the Stentor icon next to the clock")}, or run <code>stentor settings</code> in a terminal.</p></main>
 """.encode("utf-8")
