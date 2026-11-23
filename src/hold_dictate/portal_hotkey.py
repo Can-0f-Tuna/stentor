@@ -11,8 +11,10 @@ License, Copyright (c) 2026 Christopher Langton), and the shortcut id rule in `s
 - giving up on a request while its dialog is open leaves the shortcuts with no key (KDE), so the wait is long;
 - Hyprland takes every shortcut without a key: you bind the id by name in its config.
 
-Checked against xdg-desktop-portal 1.21 with a stand-in for the desktop's side (tests/portal_stand_in.py). It has
-not run on GNOME, KDE or Hyprland themselves yet."""
+Checked against xdg-desktop-portal 1.21 with a stand-in for the desktop's side (tests/portal_stand_in.py), and by
+hand on GNOME Shell 51 in a headless session (2026-11-23): its dialog showed the request, and once added, holding
+and tapping F9 and Ctrl+Alt+D gave a start at the press and a stop at the release; a restart bound with no dialog;
+Alt+Space was granted and never arrived, which `kept_by_gnome` now reports. Not yet run on KDE or Hyprland."""
 import os
 import queue
 import re
@@ -74,6 +76,41 @@ def shortcut_id(name: str, hotkey, assigns: bool) -> str:
     an unchanged one keeps its id, and with it any key you gave it in the desktop's own settings. Where the desktop
     assigns the keys the id is the bare name, so a bind written in its config survives a change here."""
     return name if assigns else f"{name}-{_trigger(hotkey).replace('+', '-')}"
+
+
+GNOME_SCHEMAS = ("org.gnome.desktop.wm.keybindings", "org.gnome.shell.keybindings", "org.gnome.mutter.keybindings",
+                 "org.gnome.mutter.wayland.keybindings", "org.gnome.settings-daemon.plugins.media-keys")
+
+
+def gnome_bindings() -> str:
+    """GNOME's own shortcuts, as `gsettings` lists them. Empty anywhere else."""
+    import shutil
+    import subprocess
+    if "gnome" not in os.environ.get("XDG_CURRENT_DESKTOP", "").lower() or not shutil.which("gsettings"):
+        return ""
+    found = []
+    for schema in GNOME_SCHEMAS:
+        try:
+            found.append(subprocess.run(["gsettings", "list-recursively", schema], capture_output=True, text=True, timeout=3).stdout)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return "\n".join(found)
+
+
+def kept_by_gnome(hotkey, listed: str) -> str:
+    """The name of GNOME's own shortcut on this key, or "". GNOME grants an app a key it uses itself and then never
+    sends it: Alt+Space opens the window menu (seen on GNOME 51, and what anomalyco/hex warns of)."""
+    wanted = (frozenset(hotkey.mods), str(hotkey.key).lower())
+    names = {"control": "ctrl", "primary": "ctrl", "ctrl": "ctrl", "alt": "alt", "shift": "shift", "super": "super", "meta": "super"}
+    for line in listed.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        for accelerator in re.findall(r"'([^']+)'", parts[2]):
+            mods = frozenset(names.get(mod.lower(), mod.lower()) for mod in re.findall(r"<([^>]+)>", accelerator))
+            if (mods, re.sub(r"<[^>]+>", "", accelerator).lower()) == wanted:
+                return parts[1]
+    return ""
 
 
 class GlobalShortcuts:
@@ -323,8 +360,9 @@ class PortalBackend:
         report = None
         notices, effective = self._bindings(shortcuts, granted, assigns)
         detector.set_portal_shortcuts(effective)
+        listed = gnome_bindings()
         while unchanged():
-            notice = " ".join(notices)
+            notice = " ".join(notices + self._kept(shortcuts, effective, listed))
             if notice != report:
                 self.on_problem(notice)
                 report = notice
@@ -357,6 +395,18 @@ class PortalBackend:
                     emit("second:stop" if name == "second" else "stop")
             elif not toggle:
                 emit(action)
+
+    @staticmethod
+    def _kept(shortcuts, effective, listed):
+        """A notice for each shortcut whose key GNOME uses itself."""
+        notices = []
+        for _, name, label, requested in shortcuts:
+            key = effective.get(name) or (requested if name in effective else None)
+            taken = kept_by_gnome(key, listed) if key is not None and listed else ""
+            if taken:
+                notices.append(f"GNOME uses {key} itself ({taken}), so it will not reach hold-dictate. "
+                               f"Choose another shortcut for {label.lower()}, such as ctrl+alt+space.")
+        return notices
 
     @staticmethod
     def _bindings(shortcuts, granted, assigns=False):

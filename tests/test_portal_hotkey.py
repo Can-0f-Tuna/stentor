@@ -184,6 +184,30 @@ def test_a_changed_key_is_asked_for_under_a_new_id(listener, monkeypatch):
     assert listener.portal.closed == ["/session", "/session"]
 
 
+GNOME_LISTED = """org.gnome.desktop.wm.keybindings activate-window-menu ['<Alt>space']
+org.gnome.desktop.wm.keybindings close ['<Alt>F4']
+org.gnome.shell.keybindings toggle-message-tray ['<Super>v', '<Super>m']
+org.gnome.settings-daemon.plugins.media-keys screensaver ['<Super>l']
+org.gnome.desktop.wm.keybindings switch-input-source @as []
+org.gnome.settings-daemon.plugins.media-keys logout ['<Control><Alt>Delete']"""
+
+
+def test_a_key_gnome_uses_itself_is_reported(listener, monkeypatch):
+    """GNOME grants Alt+Space to an app and goes on opening its window menu with it."""
+    assert portal_hotkey.kept_by_gnome(parse_hotkey("alt+space"), GNOME_LISTED) == "activate-window-menu"
+    assert portal_hotkey.kept_by_gnome(parse_hotkey("super+m"), GNOME_LISTED) == "toggle-message-tray"
+    assert portal_hotkey.kept_by_gnome(parse_hotkey("ctrl+alt+space"), GNOME_LISTED) == ""
+    assert portal_hotkey.kept_by_gnome(parse_hotkey("f9"), GNOME_LISTED) == ""
+    monkeypatch.setattr(portal_hotkey, "gnome_bindings", lambda: GNOME_LISTED)
+    _, notices, _ = listener(HoldDetector(parse_hotkey("alt+space")), {"dictation": "Alt+Space"}, [])
+    assert "GNOME uses alt+space itself (activate-window-menu)" in notices[-1]
+
+
+def test_gnome_is_not_asked_on_another_desktop(monkeypatch):
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    assert portal_hotkey.gnome_bindings() == ""
+
+
 def test_hyprland_binds_by_name_so_the_id_never_changes(listener, monkeypatch):
     monkeypatch.setenv("XDG_CURRENT_DESKTOP", "Hyprland")
     detector = HoldDetector(parse_hotkey("alt+space"))
