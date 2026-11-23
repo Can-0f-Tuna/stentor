@@ -60,6 +60,23 @@ def test_vad_hears_a_quiet_microphone():
     assert audio.speech_only(clip) is not None
 
 
+def test_vad_hears_the_same_words_whatever_the_microphone_level():
+    rng = np.random.default_rng(0)
+    room = lambda seconds: (rng.standard_normal(int(audio.SAMPLE_RATE * seconds)) * 0.001).astype(np.float32)
+    clip = np.concatenate([room(1.0), tone(0.8, amp=0.03), room(0.7), tone(1.2, amp=0.02), room(1.0)])
+    normal = audio.speech_only(clip)
+    for lower in (20, 30):  # a microphone set that many dB too low
+        heard = audio.speech_only(clip * 10 ** (-lower / 20))
+        assert heard is not None and len(heard) == len(normal), lower
+
+
+def test_vad_keeps_a_quiet_room_silent_at_any_microphone_level():
+    rng = np.random.default_rng(0)
+    room = (rng.standard_normal(audio.SAMPLE_RATE * 3) * 0.001).astype(np.float32)
+    for lower in (0, 20, 30, 40):
+        assert audio.speech_only(room * 10 ** (-lower / 20)) is None, lower
+
+
 def test_wav_roundtrip(tmp_path):
     p = tmp_path / "a.wav"
     p.write_bytes(audio.wav_bytes(tone(0.5)))

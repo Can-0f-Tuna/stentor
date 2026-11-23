@@ -116,13 +116,16 @@ def _voiced(audio: np.ndarray, frame: int) -> np.ndarray:
     Speech rises and falls and room noise holds steady, so a quiet clip that barely moves has no speech in it.
     A loud steady clip is speech with no pause to measure from: words lost for good cost more than one wasted
     request. So does a clip with few pauses, so the bar stays within 12 dB of its loud frames, or only those
-    would count and the rest of the words would be cut."""
+    would count and the rest of the words would be cut.
+
+    The bar follows the clip and not a fixed level, so a microphone set 30 dB too low is heard like any other:
+    a fixed -60 dBFS bar dropped half of such clips whole. Only what is next to digital silence never counts."""
     n = len(audio) // frame
     rms = np.sqrt(np.mean(audio[: n * frame].reshape(n, frame) ** 2, axis=1)) + 1e-9
     quiet, loud = np.percentile(rms, 10), np.percentile(rms, 95)
     if loud < quiet * 2:
         return np.full(n, loud > 10 ** (-35 / 20))
-    return rms > max(min(quiet * 3, loud / 4), 10 ** (-60 / 20))
+    return rms > max(min(quiet * 3, loud / 4), 10 ** (-80 / 20))
 
 
 def is_dead(audio: np.ndarray) -> bool:
