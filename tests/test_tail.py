@@ -7,10 +7,10 @@ import types
 import numpy as np
 import pytest
 
-from hold_dictate import audio
-from hold_dictate.app import Dictation
-from hold_dictate.config import Config
-from hold_dictate.live import LiveTyper
+from stentor import audio
+from stentor.app import Dictation
+from stentor.config import Config
+from stentor.live import LiveTyper
 
 from test_app import FakeFeedback, Pasted, settle
 

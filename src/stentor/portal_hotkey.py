@@ -158,7 +158,7 @@ class GlobalShortcuts:
         except self.dbus_error as e:
             # Older portals infer host identities themselves.
             if not e.name.startswith("org.freedesktop.DBus.Error.Unknown"):
-                raise PortalUnavailable(f"The desktop portal could not identify hold-dictate ({e}).") from e
+                raise PortalUnavailable(f"The desktop portal could not identify Stentor ({e}).") from e
 
         bus = self.connection.bus_proxy
         owner, = bus.GetNameOwner(DESKTOP, _timeout=CALL_TIMEOUT)
@@ -200,12 +200,12 @@ class GlobalShortcuts:
                 if code == 0:
                     return result
                 if code == 1:
-                    raise PortalRefused("The desktop shortcut request was declined. Change the shortcut or restart hold-dictate to ask again.")
+                    raise PortalRefused("The desktop shortcut request was declined. Change the shortcut or restart Stentor to ask again.")
                 raise PortalUnavailable(f"The desktop could not {'create a shortcut session' if method == 'CreateSession' else 'assign global shortcuts'}.")
             if method == "BindShortcuts":
                 event = self._session_event(args[0], interface, member, emitted_at, body)
                 if event == ("closed", None):
-                    raise PortalRefused("The desktop closed the shortcut session. Change the shortcut or restart hold-dictate to reconnect.")
+                    raise PortalRefused("The desktop closed the shortcut session. Change the shortcut or restart Stentor to reconnect.")
                 if event:
                     self.pending_events.append(event)
         try:
@@ -215,7 +215,7 @@ class GlobalShortcuts:
         if keep_waiting():
             if method == "CreateSession":
                 raise PortalUnavailable("The desktop did not respond to the shortcut session request.")
-            raise PortalRefused("The desktop shortcut request timed out. Change the shortcut or restart hold-dictate to ask again.")
+            raise PortalRefused("The desktop shortcut request timed out. Change the shortcut or restart Stentor to ask again.")
         return {}
 
     def create_session(self, keep_waiting, on_tick):
@@ -299,7 +299,7 @@ class PortalBackend:
                 try:
                     on_action(action)
                 except Exception as e:
-                    print(f"hold-dictate: {action} failed: {e!r}", file=sys.stderr, flush=True)
+                    print(f"stentor: {action} failed: {e!r}", file=sys.stderr, flush=True)
 
         worker = threading.Thread(target=deliver, daemon=True, name="portal hotkey actions")
         worker.start()
@@ -374,7 +374,7 @@ class PortalBackend:
                 break
             kind, value = event
             if kind == "closed":
-                self.on_problem("The desktop closed the shortcut session. Change the shortcut or restart hold-dictate to reconnect.")
+                self.on_problem("The desktop closed the shortcut session. Change the shortcut or restart Stentor to reconnect.")
                 break
             if kind == "changed":  # you gave it another key in the desktop's settings
                 emit("cancel")
@@ -404,7 +404,7 @@ class PortalBackend:
             key = effective.get(name) or (requested if name in effective else None)
             taken = kept_by_gnome(key, listed) if key is not None and listed else ""
             if taken:
-                notices.append(f"GNOME uses {key} itself ({taken}), so it will not reach hold-dictate. "
+                notices.append(f"GNOME uses {key} itself ({taken}), so it will not reach Stentor. "
                                f"Choose another shortcut for {label.lower()}, such as ctrl+alt+space.")
         return notices
 

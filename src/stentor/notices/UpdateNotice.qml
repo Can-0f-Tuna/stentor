@@ -87,8 +87,8 @@ Item {
     Process {
         id: installUpdate
         command: {
-            const python = Quickshell.env("HOLD_DICTATE_PYTHON");
-            return python ? [python, "-m", "hold_dictate", "update"] : ["hold-dictate", "update"];
+            const python = Quickshell.env("STENTOR_PYTHON");
+            return python ? [python, "-m", "stentor", "update"] : ["stentor", "update"];
         }
         onExited: code => {
             if (code !== 0)

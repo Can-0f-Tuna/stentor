@@ -101,8 +101,8 @@ Item {
     Process {
         id: openSettings
         command: {
-            const python = Quickshell.env("HOLD_DICTATE_PYTHON");
-            return (python ? [python, "-m", "hold_dictate"] : ["hold-dictate"]).concat(["settings"]);
+            const python = Quickshell.env("STENTOR_PYTHON");
+            return (python ? [python, "-m", "stentor"] : ["stentor"]).concat(["settings"]);
         }
     }
 

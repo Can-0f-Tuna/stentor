@@ -9,7 +9,7 @@ import urllib.request
 from . import __version__, config as cfgmod, extensions, service
 from .config import OFFLINE_COMMAND, PROVIDERS, Config
 
-REPO = "https://github.com/Can-0f-Tuna/hold-dictate"
+REPO = "https://github.com/Can-0f-Tuna/stentor"
 
 
 def ask(question: str, default: str = "") -> str:
@@ -28,7 +28,7 @@ def yes(question: str, default: bool = True) -> bool:
 
 def cmd_setup(args) -> int:
     cfg = cfgmod.load()
-    print("\nhold-dictate setup\n")
+    print("\nStentor setup\n")
     if args.provider:
         choice = args.provider
     else:
@@ -42,7 +42,7 @@ def cmd_setup(args) -> int:
 
     if choice == "local":
         if importlib.util.find_spec("faster_whisper") is None:
-            print(f"\nLocal mode needs the offline engine. Run:\n    {OFFLINE_COMMAND}\nthen run `hold-dictate setup` again.")
+            print(f"\nLocal mode needs the offline engine. Run:\n    {OFFLINE_COMMAND}\nthen run `stentor setup` again.")
             return 1
         cfg.local_model = ask("Model (tiny, base, small, medium, large-v3-turbo, or a Hugging Face repo)", cfg.local_model)
     else:
@@ -86,7 +86,7 @@ def cmd_setup(args) -> int:
     if sys.platform == "darwin":
         print("macOS will ask for Microphone and Accessibility / Input Monitoring access the first time. Allow them.")
     elif sys.platform.startswith("linux"):
-        print("Problems? Run `hold-dictate doctor`.")
+        print("Problems? Run `stentor doctor`.")
     return 0
 
 
@@ -98,7 +98,7 @@ def cmd_doctor(args) -> int:
     if args.json:
         print(json.dumps({"ok": ok, "checks": rows}))
         return 0 if ok else 1
-    print(f"hold-dictate {__version__} on {sys.platform}, config {cfgmod.config_path()}\n")
+    print(f"Stentor {__version__} on {sys.platform}, config {cfgmod.config_path()}\n")
     for row in rows:
         print(f"  {'OK ' if row['ok'] else 'FIX'}  {row['text']}" + (f"\n         {row['fix']}" if row["fix"] else ""))
     print("\nAll good." if ok else "\nFix the items marked FIX, then run this again.")
@@ -123,7 +123,7 @@ def cmd_history(args) -> int:
         print("Deleted." if found else "No dictation has that id.")
         return 0 if found else 1
     if args.action == "search" and not args.value:
-        print("Say what to search for: hold-dictate history search WORDS")
+        print("Say what to search for: stentor history search WORDS")
         return 1
     rows = history.entries(cfg, args.value or "" if args.action == "search" else "")
     if hasattr(sys.stdout, "reconfigure"):
@@ -151,7 +151,7 @@ def cmd_file(args) -> int:
         from .textproc import clean
         print(clean(transcribe(cfg, LocalTranscriber(cfg), speech)[0], cfg) or "(nothing to paste)")
     except (TranscribeError, ValueError, OSError, EOFError, audio.wave.Error) as e:
-        print(f"hold-dictate: {e}", file=sys.stderr)
+        print(f"stentor: {e}", file=sys.stderr)
         return 1
     return 0
 
@@ -179,7 +179,7 @@ def cmd_settings(args, anchor: str = "", alongside=None) -> int:
         show(url)
         return 0
     server = SettingsServer(cfgmod.load(), daemon=False, port=0).start()
-    print("hold-dictate is not running, so this window serves the settings page until you press Ctrl+C:")
+    print("Stentor is not running, so this window serves the settings page until you press Ctrl+C:")
     print(f"  {server.url}")
     show(server.url)
     try:
@@ -192,7 +192,7 @@ def cmd_settings(args, anchor: str = "", alongside=None) -> int:
 
 
 def _daemon(path: str, get: bool = False) -> dict | None:
-    """POSTs to (or GETs from) the running hold-dictate's local API. None when it is not running."""
+    """POSTs to (or GETs from) the running Stentor's local API. None when it is not running."""
     from .settings_ui import running_url, runtime_file
     if not running_url():
         return None
@@ -206,25 +206,25 @@ def _daemon(path: str, get: bool = False) -> dict | None:
 
 
 def cmd_update(_args) -> int:
-    """Installs the latest release in the running hold-dictate (the pill's "!" tab runs this)."""
+    """Installs the latest release in the running Stentor (the pill's "!" tab runs this)."""
     import webbrowser
     from .settings_ui import running_url
     state = _daemon("/api/update/install")
     if state is None:
-        print("hold-dictate is not running. Start it, or run the install script again to update.")
+        print("Stentor is not running. Start it, or run the install script again to update.")
         return 1
     problem = state["update"]["can_update"]
     if problem:  # cannot install itself here: the settings page explains what to do
         print(f"Cannot update automatically: {problem}. Opening the settings.")
         webbrowser.open(running_url())
         return 1
-    print(f"Installing {state['update']['latest'] or 'the latest version'}; hold-dictate restarts when it is done.")
+    print(f"Installing {state['update']['latest'] or 'the latest version'}; Stentor restarts when it is done.")
     return 0
 
 
 def cmd_offline(_args) -> int:
     """Installs the offline engine the way an update installs: the latest release again, with the `local` extra,
-    on the Python this copy runs on. A running hold-dictate does it and restarts; else this command does."""
+    on the Python this copy runs on. A running Stentor does it and restarts; else this command does."""
     if importlib.util.find_spec("faster_whisper"):
         print("The offline engine is already installed. Choose Offline in the settings to use it.")
         return 0
@@ -250,19 +250,19 @@ def cmd_offline(_args) -> int:
         import subprocess
         subprocess.Popen(["powershell", "-NoProfile", "-Command", updater.windows_helper(start=False) + "; Write-Host 'Done. Choose Offline in the settings.'; pause"],
                          creationflags=0x00000010, close_fds=True)  # CREATE_NEW_CONSOLE: you see it finish
-        print("It installs in a new window once this one is done. hold-dictate can start after that.")
+        print("It installs in a new window once this one is done. Stentor can start after that.")
         return 0
     print("\nThe offline engine is installed. Choose Offline in the settings to use it.")
     return 0
 
 
 def _follow_offline(state: dict) -> int:
-    """Shows how the running hold-dictate's install goes, until it restarts with the engine."""
+    """Shows how the running Stentor's install goes, until it restarts with the engine."""
     from .settings_ui import running_url
     if state["offline"]["can_install"]:
-        print(f"hold-dictate can't install it by itself: {state['offline']['can_install']}.")
+        print(f"Stentor can't install it by itself: {state['offline']['can_install']}.")
         return 1
-    print("hold-dictate is installing the offline engine, then restarts. It is a large download, so it takes a few minutes.")
+    print("Stentor is installing the offline engine, then restarts. It is a large download, so it takes a few minutes.")
     shown, gone = "", None
     deadline = time.monotonic() + 30 * 60
     while time.monotonic() < deadline:
@@ -274,14 +274,14 @@ def _follow_offline(state: dict) -> int:
         if state is None:  # restarting
             gone = gone or time.monotonic()
             if time.monotonic() - gone > 120:
-                print("hold-dictate didn't come back. Start it again, then check with: hold-dictate doctor")
+                print("Stentor didn't come back. Start it again, then check with: stentor doctor")
                 return 1
             continue
         if gone or state["local_installed"] and not state["offline"]["ready"]:  # back after the restart
             if state["local_installed"]:
                 print("The offline engine is installed. Choose Offline in the settings to use it.")
                 return 0
-            print(f"It didn't install: {state['offline']['status'] or 'hold-dictate restarted without it.'}")
+            print(f"It didn't install: {state['offline']['status'] or 'Stentor restarted without it.'}")
             return 1
         offline = state["offline"]
         line = f"{offline['progress']}%" if offline["progress"] is not None else offline["status"]
@@ -296,24 +296,24 @@ def _follow_offline(state: dict) -> int:
 
 
 def cmd_last(args) -> int:
-    """Pastes or copies the last dictation again. Bind `hold-dictate paste-last` to a key to use it anywhere."""
+    """Pastes or copies the last dictation again. Bind `stentor paste-last` to a key to use it anywhere."""
     result = _daemon(f"/api/last/{args.action}")
     if result is None:
-        print("hold-dictate is not running.")
+        print("Stentor is not running.")
         return 1
     if result.get("message"):
-        print(f"hold-dictate: {result['message']}", file=sys.stderr)
+        print(f"stentor: {result['message']}", file=sys.stderr)
         return 1
     return 0
 
 
 def cmd_dictation(args) -> int:
-    """Starts or stops a recording in the running hold-dictate, as its hotkey would. For a desktop where it cannot
+    """Starts or stops a recording in the running Stentor, as its hotkey would. For a desktop where it cannot
     read the keyboard: bind `dictation start` to a key's press and `dictation stop` to its release, or `dictation
     toggle` to one key, in the desktop's own keyboard settings."""
     result = _daemon(f"/api/dictation/{args.action}")
     if result is None:
-        print("hold-dictate is not running.")
+        print("Stentor is not running.")
         return 1
     return 0
 
@@ -334,7 +334,7 @@ def cmd_run(_args) -> int:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="hold-dictate", description="Hold a hotkey, speak, release: text appears at the cursor.")
+    p = argparse.ArgumentParser(prog="stentor", description="Hold a hotkey, speak, release: text appears at the cursor.")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="command")
     sub.add_parser("run", help="start dictating (default)").set_defaults(fn=cmd_run)
@@ -349,7 +349,7 @@ def main(argv=None) -> int:
     s.add_argument("--no-service", action="store_true", help="do not install start-at-login")
     s.set_defaults(fn=cmd_setup)
     st = sub.add_parser("settings", help="open the settings page in your browser")
-    st.add_argument("--wait", type=float, default=0, help="seconds to wait for hold-dictate to start")
+    st.add_argument("--wait", type=float, default=0, help="seconds to wait for Stentor to start")
     st.set_defaults(fn=cmd_settings)
     d = sub.add_parser("doctor", help="check that everything is in place")
     d.add_argument("--offline", action="store_true", help="stay on this computer: the key is not tried with the service")
@@ -362,7 +362,7 @@ def main(argv=None) -> int:
     sub.add_parser("offline", help="install the offline engine, to dictate without internet").set_defaults(fn=cmd_offline)
     for action in ("paste", "copy"):
         sub.add_parser(f"{action}-last", help=f"{action} the last dictation again").set_defaults(fn=cmd_last, action=action)
-    dc = sub.add_parser("dictation", help="start, stop or toggle a recording in the running hold-dictate, as the hotkey would")
+    dc = sub.add_parser("dictation", help="start, stop or toggle a recording in the running Stentor, as the hotkey would")
     dc.add_argument("action", choices=["start", "stop", "toggle"])
     dc.set_defaults(fn=cmd_dictation)
     h = sub.add_parser("history", help="list, search, delete or clear saved dictations")

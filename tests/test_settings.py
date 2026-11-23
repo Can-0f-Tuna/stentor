@@ -5,15 +5,15 @@ import urllib.request
 
 import pytest
 
-from hold_dictate import config, updater
-from hold_dictate.config import HEBREW_PROMPT, Config
-from hold_dictate.hotkey import HoldDetector, parse_hotkey
-from hold_dictate.settings_ui import SettingsServer
+from stentor import config, updater
+from stentor.config import HEBREW_PROMPT, Config
+from stentor.hotkey import HoldDetector, parse_hotkey
+from stentor.settings_ui import SettingsServer
 
 
 @pytest.fixture
 def server(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOLD_DICTATE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("STENTOR_CONFIG_DIR", str(tmp_path))
     saved = []
     s = SettingsServer(Config(api_key="gsk_secret1234"), on_saved=saved.append, port=0).start()
     s.saved = saved
@@ -36,7 +36,7 @@ def call(server, path, body=None, token=None, host=None):
 
 def test_page_needs_token(server):
     with urllib.request.urlopen(server.url, timeout=5) as r:
-        assert b"hold-dictate settings" in r.read()
+        assert b"Stentor settings" in r.read()
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(f"http://127.0.0.1:{server.port}/?t=wrong", timeout=5)
     assert e.value.code == 403
@@ -83,7 +83,7 @@ def test_style_and_models(server, tmp_path):
 
 
 def test_overlay_gets_the_style():
-    from hold_dictate.feedback import Feedback
+    from stentor.feedback import Feedback
     fb = Feedback.__new__(Feedback)
     fb.cfg, fb.proc, fb.sent = Config(overlay_style="lines"), None, []
     fb.events = type("W", (), {"write": lambda self, line: fb.sent.append(line)})()
@@ -110,7 +110,7 @@ def test_updater_still_checks_when_auto_update_is_off(monkeypatch):
 
 
 def test_update_command_installs_through_the_daemon(server, monkeypatch, capsys):
-    from hold_dictate import cli
+    from stentor import cli
     asked = []
     server.updater = type("U", (), {
         "latest": "v9.9.9", "status": "", "progress": None, "available": lambda self: True, "can_update": lambda self: "",
@@ -149,7 +149,7 @@ def test_token_survives_a_restart(server):
 
 
 def test_running_url_finds_the_daemon(server):
-    from hold_dictate.settings_ui import running_url
+    from stentor.settings_ui import running_url
     assert running_url() == server.url
 
 
@@ -163,7 +163,7 @@ def test_hotkey_can_change_while_held():
 def test_version_compare_and_install_spec(monkeypatch):
     assert updater.newer("v0.10.0", "0.9.9") and not updater.newer("v0.3.0", "0.3.0")
     assert updater.parse_version("v1.2.3rc1") == (1, 2, 3)
-    assert updater.install_spec("v0.4.0", []) == "hold-dictate @ https://github.com/Can-0f-Tuna/hold-dictate/archive/refs/tags/v0.4.0.tar.gz"
+    assert updater.install_spec("v0.4.0", []) == "stentor @ https://github.com/Can-0f-Tuna/stentor/archive/refs/tags/v0.4.0.tar.gz"
 
 
 def test_core_alone_updates_from_the_latest_github_release(monkeypatch):
@@ -229,7 +229,7 @@ def test_install_progress_follows_uv(monkeypatch):
     u.progress = 0
     seen = []
     class Proc:
-        stdout = iter(["Resolved 5 packages in 1s\n", "   Building hold-dictate @ git+https://x\n", "Prepared 5 packages\n", "Installed 5 packages\n"])
+        stdout = iter(["Resolved 5 packages in 1s\n", "   Building stentor @ git+https://x\n", "Prepared 5 packages\n", "Installed 5 packages\n"])
         def wait(self):
             return 0
     def popen(*a, **k):
@@ -277,13 +277,13 @@ def test_last_dictation_without_session(server):
     _, state = call(server, "/api/state")
     assert state["last"] == {"text": "", "app": ""}
     assert "um" in state["fillers_default"] and isinstance(state["focus_detect"], bool)
-    assert call(server, "/api/last/copy", {}) == (200, {"message": "hold-dictate is not running"})
-    assert call(server, "/api/last/paste", {}) == (200, {"message": "hold-dictate is not running"})
+    assert call(server, "/api/last/copy", {}) == (200, {"message": "Stentor is not running"})
+    assert call(server, "/api/last/paste", {}) == (200, {"message": "Stentor is not running"})
 
 
 def test_dictation_commands_reach_the_running_session(server):
-    from hold_dictate import cli
-    assert call(server, "/api/dictation/toggle", {}) == (200, {"message": "hold-dictate is not running"})
+    from stentor import cli
+    assert call(server, "/api/dictation/toggle", {}) == (200, {"message": "Stentor is not running"})
     asked = []
     server.session = type("Session", (), {"command": lambda self, action: asked.append(action)})()
     for action in ("start", "stop", "toggle"):
@@ -294,7 +294,7 @@ def test_dictation_commands_reach_the_running_session(server):
 
 
 def test_last_dictation_with_session(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOLD_DICTATE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("STENTOR_CONFIG_DIR", str(tmp_path))
     done = []
     session = type("Session", (), {
         "last_text": "שלום world", "last_app": "slack",

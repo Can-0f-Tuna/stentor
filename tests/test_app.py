@@ -9,11 +9,11 @@ import pytest
 
 import numpy as np
 
-from hold_dictate import audio
-from hold_dictate.app import Dictation
-from hold_dictate.config import Config
-from hold_dictate.live import LiveTyper
-from hold_dictate.hotkey import EV_FORMAT, EvdevBackend, HoldDetector, parse_hotkey
+from stentor import audio
+from stentor.app import Dictation
+from stentor.config import Config
+from stentor.live import LiveTyper
+from stentor.hotkey import EV_FORMAT, EvdevBackend, HoldDetector, parse_hotkey
 
 
 class FakeFeedback:
@@ -224,7 +224,7 @@ def test_silence_stop_waits_while_you_talk_and_is_off_at_zero(api):
 
 
 def test_silence_stop_gives_up_when_nothing_is_said(api, monkeypatch):
-    import hold_dictate.app as app_mod
+    import stentor.app as app_mod
     monkeypatch.setattr(app_mod, "NO_SPEECH_SECONDS", 1.5)
     d, _, _ = dictation(cfg_for(api, hotkey_mode="auto", silence_stop=0.2), recorder=lambda lv: TalkingRecorder(lv, talk=0))
     tap(d)
@@ -281,7 +281,7 @@ def test_app_rules_copy_only_and_off(api):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX shell commands")
 def test_post_hook_changes_or_drops_text(api):
-    d, out, _ = dictation(cfg_for(api, post_hook='printf "[%s] " "$HOLD_DICTATE_APP"; cat'), app="kitty")
+    d, out, _ = dictation(cfg_for(api, post_hook='printf "[%s] " "$STENTOR_APP"; cat'), app="kitty")
     tap(d, 0.3)
     settle(d)
     assert out.calls[0]["text"] == "[kitty] hello world"
@@ -522,7 +522,7 @@ def test_on_the_local_model_a_short_phrase_waits_for_the_next_one():
 
 
 def test_a_press_after_the_local_model_was_freed_loads_it_while_you_speak(monkeypatch):
-    from hold_dictate.providers import LocalTranscriber
+    from stentor.providers import LocalTranscriber
     loads = []
     monkeypatch.setattr(LocalTranscriber, "preload", lambda self: loads.append(1))
     d = Dictation(Config(provider="local", min_hold=9), FakeFeedback(), recorder_factory=FakeRecorder)
@@ -547,7 +547,7 @@ def test_a_dictation_right_after_the_last_one_in_the_same_app_gets_a_space(api, 
     d.focus = lambda: "Safari"  # another app
     tap(d, 0.3)
     settle(d)
-    monkeypatch.setattr("hold_dictate.app.JOIN_SECONDS", -1)  # as if much later
+    monkeypatch.setattr("stentor.app.JOIN_SECONDS", -1)  # as if much later
     tap(d, 0.3)
     settle(d)
     assert [c["text"] for c in out.calls[3:]] == [", then", ", then"]

@@ -1,5 +1,5 @@
-from hold_dictate import feedback
-from hold_dictate.config import Config
+from stentor import feedback
+from stentor.config import Config
 
 
 def test_beeps_play_even_when_the_pill_is_showing(monkeypatch):
@@ -54,7 +54,7 @@ def test_macos_beeps_never_open_a_portaudio_stream(monkeypatch):
     """A PortAudio output on the device that is recording sets its rate, and the recording comes out silent."""
     import sys
     import types
-    from hold_dictate import macos
+    from stentor import macos
     played = []
     monkeypatch.setattr(feedback.sys, "platform", "darwin")
     monkeypatch.setattr(feedback.threading, "Thread", lambda target, daemon: type("T", (), {"start": lambda self: target()})())

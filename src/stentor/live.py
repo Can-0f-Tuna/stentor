@@ -79,7 +79,7 @@ class LiveTyper:
             try:
                 words = self.clean(self.transcribe(speech)).split()
             except Exception as e:  # the last pass reports real problems and types what is left
-                print(f"hold-dictate: live typing paused for {self.AFTER_ERROR} seconds: {e}", file=sys.stderr, flush=True)
+                print(f"stentor: live typing paused for {self.AFTER_ERROR} seconds: {e}", file=sys.stderr, flush=True)
                 self.not_before = time.monotonic() + self.AFTER_ERROR
                 continue
             if self._type(words if ended else words[:-UNSURE_WORDS]) and ended:

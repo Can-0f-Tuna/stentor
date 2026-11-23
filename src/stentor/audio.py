@@ -76,7 +76,7 @@ class Recorder:
             self.stream.stop()
             self.stream.close()
         except Exception as e:
-            print(f"hold-dictate: closing the microphone: {e}", file=sys.stderr, flush=True)
+            print(f"stentor: closing the microphone: {e}", file=sys.stderr, flush=True)
 
 
 def level_of(samples: np.ndarray) -> float:

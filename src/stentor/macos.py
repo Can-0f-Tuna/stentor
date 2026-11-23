@@ -37,7 +37,7 @@ def ask_microphone():
             recorder.live.wait(0.5)
             recorder.stop()
         except Exception as e:
-            print(f"hold-dictate: couldn't ask for the microphone: {e}", file=sys.stderr, flush=True)
+            print(f"stentor: couldn't ask for the microphone: {e}", file=sys.stderr, flush=True)
     threading.Thread(target=run, daemon=True, name="microphone question").start()
 
 
@@ -54,11 +54,11 @@ def ask_accessibility():
         import HIServices
         HIServices.AXIsProcessTrustedWithOptions({HIServices.kAXTrustedCheckOptionPrompt: True})
     except Exception as e:
-        print(f"hold-dictate: couldn't ask for Accessibility: {e}", file=sys.stderr, flush=True)
+        print(f"stentor: couldn't ask for Accessibility: {e}", file=sys.stderr, flush=True)
 
 
 def grantee() -> tuple[str, str]:
-    """(name, path) of the program macOS gives the permissions to: the terminal hold-dictate was started from,
+    """(name, path) of the program macOS gives the permissions to: the terminal Stentor was started from,
     or its Python when it starts at login. Every Python is a program of its own to macOS, so a new one asks again."""
     term = os.environ.get("TERM_PROGRAM")
     if term:
@@ -126,7 +126,7 @@ def _provider(text: str, read: threading.Event):
         import objc
         from Foundation import NSObject
 
-        class HoldDictatePasteProvider(NSObject, protocols=[objc.protocolNamed("NSPasteboardItemDataProvider")]):
+        class StentorPasteProvider(NSObject, protocols=[objc.protocolNamed("NSPasteboardItemDataProvider")]):
             def pasteboard_item_provideDataForType_(self, board, item, kind):
                 item.setString_forType_(self.text, kind)
                 self.read.set()
@@ -134,7 +134,7 @@ def _provider(text: str, read: threading.Event):
             def pasteboardFinishedWithDataProvider_(self, board):
                 pass
 
-        _provider_class = HoldDictatePasteProvider
+        _provider_class = StentorPasteProvider
     provider = _provider_class.alloc().init()
     provider.text, provider.read = text, read
     return provider

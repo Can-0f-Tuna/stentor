@@ -1,6 +1,6 @@
-"""Extensions: other packages that add to hold-dictate. It ships with none and works the same without them.
+"""Extensions: other packages that add to Stentor. It ships with none and works the same without them.
 
-A package joins through the entry point group `hold_dictate.extensions`. The entry point names something to call
+A package joins through the entry point group `stentor.extensions`. The entry point names something to call
 with no arguments, and what that returns is the extension: any object with the methods below that it needs.
 A method that raises is logged and skipped, so a broken extension never stops a dictation.
 
@@ -41,7 +41,7 @@ Settings and commands:
   settings_routes(server) -> dict             "POST /path" -> f() answered as JSON behind the token, or
                                               "GET /path" -> f(handler, query), before any token check
   check_settings(new, changes)                may fix `new` before a save; ValueError refuses the save
-  doctor_lines() -> list                      (good, text, fix) rows for `hold-dictate doctor`. Not on the settings
+  doctor_lines() -> list                      (good, text, fix) rows for `stentor doctor`. Not on the settings
                                               page or with --offline, which stay on this computer
   extend_cli(commands)                        gets the argparse subparsers to add to
 Updates:
@@ -56,7 +56,7 @@ Updates:
 import sys
 from importlib.metadata import entry_points
 
-GROUP = "hold_dictate.extensions"
+GROUP = "stentor.extensions"
 FAILED = object()
 
 _loaded = None
@@ -73,7 +73,7 @@ def loaded() -> list:
                 found.append(point.load()())
             except Exception as e:
                 _broken = True
-                print(f"hold-dictate: the extension {point.name} didn't load ({type(e).__name__})", file=sys.stderr, flush=True)
+                print(f"stentor: the extension {point.name} didn't load ({type(e).__name__})", file=sys.stderr, flush=True)
         _loaded = found
     return _loaded
 
@@ -89,7 +89,7 @@ def _call(hook, *args, passes=()):
     except passes:
         raise
     except Exception as e:  # the type only: a message could hold dictated text
-        print(f"hold-dictate: an extension failed in {getattr(hook, '__name__', 'its rewriter')} ({type(e).__name__})", file=sys.stderr, flush=True)
+        print(f"stentor: an extension failed in {getattr(hook, '__name__', 'its rewriter')} ({type(e).__name__})", file=sys.stderr, flush=True)
         return FAILED
 
 

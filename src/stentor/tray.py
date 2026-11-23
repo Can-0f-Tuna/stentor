@@ -38,9 +38,9 @@ class Tray:
             pystray.MenuItem("Copy last dictation", lambda: on_copy_last and on_copy_last()),
             pystray.MenuItem("Check for updates", lambda: on_check_updates()),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit hold-dictate", self._quit),
+            pystray.MenuItem("Quit Stentor", self._quit),
         )
-        self.icon = pystray.Icon("hold-dictate", _icon_image(), "hold-dictate", menu)
+        self.icon = pystray.Icon("stentor", _icon_image(), "stentor", menu)
 
     def _quit(self):
         self.icon.stop()

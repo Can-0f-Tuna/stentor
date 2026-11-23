@@ -1,4 +1,4 @@
-"""The checks behind `hold-dictate doctor` and the Health section of the settings page."""
+"""The checks behind `stentor doctor` and the Health section of the settings page."""
 import json
 import os
 import subprocess
@@ -14,8 +14,8 @@ MAC_NEEDS = {
     "Accessibility": "without it the shortcut isn't seen and the text can't be pasted",
     "Microphone": "without it every recording is silent",
 }
-MAC_AFTER = {"Accessibility": "The shortcut works as soon as it's on.", "Microphone": "Then restart hold-dictate."}
-CHILD = "HOLD_DICTATE_HEALTH_CHILD"  # set for the checks the running app makes: they must not ask the app again
+MAC_AFTER = {"Accessibility": "The shortcut works as soon as it's on.", "Microphone": "Then restart Stentor."}
+CHILD = "STENTOR_HEALTH_CHILD"  # set for the checks the running app makes: they must not ask the app again
 
 
 def _mac_microphone():
@@ -40,7 +40,7 @@ def mac_access() -> dict:
 
 
 def _app_rows():
-    """The permission rows of the hold-dictate that is running, from its own checks, or None if it isn't running.
+    """The permission rows of the Stentor that is running, from its own checks, or None if it isn't running.
     In a terminal macOS answers for the terminal, which isn't what the app runs as."""
     if os.environ.get(CHILD):
         return None
@@ -63,13 +63,13 @@ def _mac_rows(line):
     rows = _app_rows()
     if rows is not None:
         for r in rows:
-            line(r["ok"], r["text"] + ", in the running hold-dictate", r["fix"])
+            line(r["ok"], r["text"] + ", in the running Stentor", r["fix"])
         return
     try:
         access = mac_access()
     except Exception as e:
         access = {}
-        print(f"hold-dictate: can't read the macOS permissions: {e}", file=sys.stderr)
+        print(f"stentor: can't read the macOS permissions: {e}", file=sys.stderr)
     from .macos import grantee
     name, path = grantee()
     who = f"{name} ({path})" if path else name
@@ -110,7 +110,7 @@ def checks(cfg, online: bool = True) -> list:
         has_mic = any(d["max_input_channels"] > 0 for d in sd.query_devices())
         line(has_mic, "microphone found", "Plug in or enable a microphone.")
     except Exception as e:
-        hint = "Install libportaudio2 (apt) or portaudio (dnf, pacman)." if sys.platform.startswith("linux") else "Install hold-dictate again: its audio part did not load."
+        hint = "Install libportaudio2 (apt) or portaudio (dnf, pacman)." if sys.platform.startswith("linux") else "Install Stentor again: its audio part did not load."
         line(False, f"audio: {e}", hint)
     if cfg.background_audio != "off":
         line(ducking.available(), "turning other apps down while you dictate",
@@ -124,7 +124,7 @@ def checks(cfg, online: bool = True) -> list:
         line(LocalTranscriber.available(), "local model library", f"Run this in a terminal: {OFFLINE_COMMAND}")
     elif online:
         problem = check_api(cfg)
-        line(not problem, f"{cfg.preset()['label']} API key", problem or "Run `hold-dictate settings`.")
+        line(not problem, f"{cfg.preset()['label']} API key", problem or "Run `stentor settings`.")
     else:
         line(bool(cfg.effective_key()), f"{cfg.preset()['label']} API key saved", "Paste your key under Transcription, then press Check and save.")
     return rows
@@ -137,9 +137,9 @@ def report() -> dict:
     if sys.platform == "darwin":
         flags["close_fds"] = False  # posix_spawn, not fork (see macos.spawn_options)
     try:
-        run = subprocess.run([sys.executable, "-m", "hold_dictate", "doctor", "--offline", "--json"], stdin=subprocess.DEVNULL,
+        run = subprocess.run([sys.executable, "-m", "stentor", "doctor", "--offline", "--json"], stdin=subprocess.DEVNULL,
                              capture_output=True, text=True, timeout=20, env=dict(os.environ, **{CHILD: "1"}), **flags)
         return json.loads(run.stdout.strip().splitlines()[-1])
     except Exception as e:
-        print(f"hold-dictate: the health checks failed: {e}", file=sys.stderr, flush=True)
-        return {"ok": False, "checks": [{"ok": False, "text": "The checks couldn't run", "fix": "Run `hold-dictate doctor` in a terminal to see why."}]}
+        print(f"stentor: the health checks failed: {e}", file=sys.stderr, flush=True)
+        return {"ok": False, "checks": [{"ok": False, "text": "The checks couldn't run", "fix": "Run `stentor doctor` in a terminal to see why."}]}

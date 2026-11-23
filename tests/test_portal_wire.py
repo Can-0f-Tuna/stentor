@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from hold_dictate.hotkey import HoldDetector, parse_hotkey
-from hold_dictate.portal_hotkey import PortalBackend, PortalUnavailable
+from stentor.hotkey import HoldDetector, parse_hotkey
+from stentor.portal_hotkey import PortalBackend, PortalUnavailable
 
 PORTAL = "/usr/libexec/xdg-desktop-portal"
 SYSTEM_PYTHON = "/usr/bin/python3"
@@ -135,7 +135,7 @@ def test_the_portal_grants_the_keys_and_reports_press_and_release(desktop):
     made = desktop("grant")
     detector = HoldDetector(parse_hotkey("alt+space"), parse_hotkey("f9"))
     listening = Listening(detector)
-    assert made.heard() == "session io.github.hold-dictate"  # the portal knows which app asks
+    assert made.heard() == "session io.github.stentor"  # the portal knows which app asks
     assert made.heard() == "bound dictation-ALT-space=ALT+space second-F9=F9"
     listening.wait(lambda: listening.notices and listening.notices[-1] == "", "granted as asked: nothing to report")
     made.tell("press dictation-ALT-space")

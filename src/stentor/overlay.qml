@@ -1,8 +1,8 @@
 // Dictation overlay: a small dark pill with a live voice visualiser, shown at the bottom centre
-// of the screen while hold-dictate is recording, and the home of the notices. Runs for the whole session so it appears instantly.
+// of the screen while Stentor is recording, and the home of the notices. Runs for the whole session so it appears instantly.
 // Two looks: "dots", the website's halftone bars (each bar is three columns of dots, dense in the
 // middle and finer toward the tips), and "lines", the original thin rounded bars.
-// Driven by lines the daemon appends to $XDG_RUNTIME_DIR/hold-dictate.events:
+// Driven by lines the daemon appends to $XDG_RUNTIME_DIR/stentor.events:
 //   C <bg> <bars> <bottom|top> <scale> [dots|lines]   look, from the settings page (sent before each S)
 //   U <version|->  an update is waiting (sent before each S): a "!" tab on the pill installs it
 //   D              the update is installed (sent by the new version): the corner chip ticks and leaves
@@ -13,7 +13,7 @@
 //   E <alert|mic|net>  something went wrong: the bars settle into a flat line and turn red, and a mark beside the pill says why
 //   Q              hide (with an update waiting, the "!" tab stays a few seconds so it can be clicked)
 // Notices live in notices/, one file each; notices/README.md says how to add one. An extension's notices
-// come from the files in $HOLD_DICTATE_NOTICES and see every line.
+// come from the files in $STENTOR_NOTICES and see every line.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -111,20 +111,20 @@ ShellRoot {
 
     Component.onCompleted: {
         const made = [];
-        for (const file of (Quickshell.env("HOLD_DICTATE_NOTICES") || "").split(":").filter(f => f)) {
+        for (const file of (Quickshell.env("STENTOR_NOTICES") || "").split(":").filter(f => f)) {
             const component = Qt.createComponent("file://" + encodeURI(file));
             const notice = component.status === Component.Ready ? component.createObject(root, { shell: root }) : null;
             if (notice)
                 made.push(notice);
             else
-                console.warn(`hold-dictate: the notice ${file} didn't load: ${component.errorString()}`);
+                console.warn(`stentor: the notice ${file} didn't load: ${component.errorString()}`);
         }
         extraNotices = made;
     }
 
     Process {
         running: true
-        command: ["tail", "-n", "0", "-F", Quickshell.env("XDG_RUNTIME_DIR") + "/hold-dictate.events"]
+        command: ["tail", "-n", "0", "-F", Quickshell.env("XDG_RUNTIME_DIR") + "/stentor.events"]
         stdout: SplitParser {
             onRead: data => root.handle(data)
         }
@@ -171,7 +171,7 @@ ShellRoot {
         exclusionMode: ExclusionMode.Ignore
         mask: problem.clickable ? problemInput : update.tabVisible ? tabInput : noInput   // clicks pass through everything else
         WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "hold-dictate"
+        WlrLayershell.namespace: "stentor"
 
         UpdateNotice {
             id: update

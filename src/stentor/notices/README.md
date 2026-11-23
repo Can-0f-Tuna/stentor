@@ -1,6 +1,6 @@
 # Notices
 
-The way hold-dictate tells you something on screen: a small "!" ball that comes from the pill. One QML file per notice; `overlay.qml` creates them and routes the daemon's events to them.
+The way Stentor tells you something on screen: a small "!" ball that comes from the pill. One QML file per notice; `overlay.qml` creates them and routes the daemon's events to them.
 
 | Notice | File | Event | What it does |
 | --- | --- | --- | --- |

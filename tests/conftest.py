@@ -49,24 +49,24 @@ def api():
 
 @pytest.fixture(autouse=True)
 def isolated_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOLD_DICTATE_CONFIG_DIR", str(tmp_path / "cfg"))
-    for name in ("GROQ_API_KEY", "OPENAI_API_KEY", "HOLD_DICTATE_API_KEY"):
+    monkeypatch.setenv("STENTOR_CONFIG_DIR", str(tmp_path / "cfg"))
+    for name in ("GROQ_API_KEY", "OPENAI_API_KEY", "STENTOR_API_KEY"):
         monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture(autouse=True)
 def no_real_ducking(monkeypatch):
     """Tests must never turn down the music on the machine running them."""
-    monkeypatch.setattr("hold_dictate.ducking.backend", lambda: None)
+    monkeypatch.setattr("stentor.ducking.backend", lambda: None)
 
 
 @pytest.fixture(autouse=True)
 def no_real_indicator(monkeypatch):
     """Tests must never open the pill on the machine running them."""
-    monkeypatch.setattr("hold_dictate.indicator.supported", lambda: False)
+    monkeypatch.setattr("stentor.indicator.supported", lambda: False)
 
 
 @pytest.fixture(autouse=True)
 def no_extensions(monkeypatch):
-    """These tests are about hold-dictate alone, whatever else is installed next to it."""
-    monkeypatch.setattr("hold_dictate.extensions._loaded", [])
+    """These tests are about Stentor alone, whatever else is installed next to it."""
+    monkeypatch.setattr("stentor.extensions._loaded", [])

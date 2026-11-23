@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from hold_dictate import paste
+from stentor import paste
 
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux paste helpers")
 

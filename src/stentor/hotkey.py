@@ -336,7 +336,7 @@ class PynputBackend:
                 try:
                     on_action(action)
                 except Exception as e:
-                    print(f"hold-dictate: {action} failed: {e!r}", file=sys.stderr, flush=True)
+                    print(f"stentor: {action} failed: {e!r}", file=sys.stderr, flush=True)
 
         threading.Thread(target=deliver, daemon=True, name="hotkey actions").start()
 
@@ -404,14 +404,14 @@ class PynputBackend:
         if _mac_trusted():
             return
         macos.ask_accessibility()
-        print(f"hold-dictate: {macos.accessibility_problem().replace(chr(10), ' ')}", file=sys.stderr, flush=True)
+        print(f"stentor: {macos.accessibility_problem().replace(chr(10), ' ')}", file=sys.stderr, flush=True)
         if self.on_problem:
             self.on_problem(macos.accessibility_problem())
         while not _mac_trusted():
             time.sleep(1)
             if on_tick:
                 on_tick()
-        print("hold-dictate: Accessibility is on; the shortcut works now", flush=True)
+        print("stentor: Accessibility is on; the shortcut works now", flush=True)
         if self.on_problem:
             self.on_problem("")
 
@@ -443,7 +443,7 @@ def _mac_enable_tap(listener, why: str):
     import Quartz
     if listener.tap is not None:
         Quartz.CGEventTapEnable(listener.tap, True)
-        print(f"hold-dictate: macOS turned the keyboard tap off ({why}); it is back on", file=sys.stderr, flush=True)
+        print(f"stentor: macOS turned the keyboard tap off ({why}); it is back on", file=sys.stderr, flush=True)
 
 
 def _mac_check_tap(listener):
@@ -461,11 +461,11 @@ def choose_backend(quick: bool = False, *, skip_portal: bool = False):
 
     On Linux the keyboard itself comes first where it can be read: it works on every desktop and it sees the real
     press and release. The desktop's shortcut portal is for a Wayland session without that access, such as before
-    the first log-out after the install. HOLD_DICTATE_HOTKEY_BACKEND (auto, evdev, portal, pynput) picks one."""
+    the first log-out after the install. STENTOR_HOTKEY_BACKEND (auto, evdev, portal, pynput) picks one."""
     if sys.platform.startswith("linux"):
-        forced = os.environ.get("HOLD_DICTATE_HOTKEY_BACKEND", "auto").strip().lower() or "auto"
+        forced = os.environ.get("STENTOR_HOTKEY_BACKEND", "auto").strip().lower() or "auto"
         if forced not in ("auto", "portal", "evdev", "pynput"):
-            return None, "Set HOLD_DICTATE_HOTKEY_BACKEND to auto, portal, evdev or pynput."
+            return None, "Set STENTOR_HOTKEY_BACKEND to auto, portal, evdev or pynput."
         if forced in ("auto", "evdev"):
             backend = EvdevBackend()
             if backend.usable():
@@ -485,11 +485,11 @@ def choose_backend(quick: bool = False, *, skip_portal: bool = False):
             if backend.usable(quick):
                 return backend, ""
             if forced == "pynput":
-                return None, "The pynput keyboard backend needs a working X11 display and hold-dictate[x11]."
+                return None, "The pynput keyboard backend needs a working X11 display and stentor[x11]."
         return None, (
             "cannot read the keyboard. Add your user to the 'input' group, then log out and back in:\n"
             "    sudo usermod -aG input $USER\n"
-            "Or bind a key in your desktop's keyboard settings to `hold-dictate dictation toggle`."
+            "Or bind a key in your desktop's keyboard settings to `stentor dictation toggle`."
         )
     backend = PynputBackend()
     if backend.usable(quick):

@@ -58,7 +58,7 @@ def _windows_front_app() -> str:
 
 
 def _mac_front_title() -> str:
-    """The focused window's title through the Accessibility API, which hold-dictate already has for pasting."""
+    """The focused window's title through the Accessibility API, which Stentor already has for pasting."""
     import ctypes
     asn = _run(["lsappinfo", "front"], text=True).stdout.strip()
     out = _run(["lsappinfo", "info", "-only", "pid", asn], text=True).stdout if asn else ""

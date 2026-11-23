@@ -2,9 +2,9 @@ import sys
 
 import pytest
 
-from hold_dictate import config, textproc
-from hold_dictate.config import Config
-from hold_dictate.textproc import apply_overrides, clean, is_hallucination, remove_fillers, run_hook, spoken_punctuation
+from stentor import config, textproc
+from stentor.config import Config
+from stentor.textproc import apply_overrides, clean, is_hallucination, remove_fillers, run_hook, spoken_punctuation
 
 FILLERS = list(textproc.FILLERS)
 
@@ -97,7 +97,7 @@ sh = pytest.mark.skipif(sys.platform == "win32", reason="POSIX shell commands")
 @sh
 def test_hook_replaces_text_and_sees_env():
     assert run_hook("tr a-z A-Z", "hello") == "HELLO"
-    assert run_hook('printf "%s:" "$HOLD_DICTATE_APP"; cat', "hi", {"HOLD_DICTATE_APP": "kitty"}) == "kitty:hi"
+    assert run_hook('printf "%s:" "$STENTOR_APP"; cat', "hi", {"STENTOR_APP": "kitty"}) == "kitty:hi"
 
 
 @sh

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "hold-dictate"
+name = "stentor"
 dynamic = ["version"]
 description = "Hold a hotkey, speak, release: the text is typed at your cursor. Linux, macOS, Windows."
 readme = "README.md"
@@ -33,13 +33,13 @@ x11 = ["pynput>=1.7.7"]
 dev = ["pytest>=8"]
 
 [project.scripts]
-hold-dictate = "hold_dictate.cli:main"
+stentor = "stentor.cli:main"
 
 [tool.hatch.version]
-path = "src/hold_dictate/__init__.py"
+path = "src/stentor/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hold_dictate"]
+packages = ["src/stentor"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

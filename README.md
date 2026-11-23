@@ -1,4 +1,4 @@
-# hold-dictate
+# Stentor
 
 Hold **Alt+Space**, speak, let go. The text is typed at your cursor, in any app.
 
@@ -9,24 +9,24 @@ Works on **Windows, macOS and Linux** (Wayland and X11). Handles mixed-language 
 macOS / Linux (Terminal):
 
 ```sh
-curl -fsSL https://hold-dictate.vercel.app/install.sh | sh
+curl -fsSL https://stentor-app.vercel.app/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://hold-dictate.vercel.app/install.ps1 | iex
+irm https://stentor-app.vercel.app/install.ps1 | iex
 ```
 
-The script installs [uv](https://docs.astral.sh/uv/), the system helpers it needs and the latest release of hold-dictate, starts it (and at every login), then opens the settings page in your browser. Sign in there with Google (a free account, once per computer), then add your API key. Running the script again reinstalls the latest release.
+The script installs [uv](https://docs.astral.sh/uv/), the system helpers it needs and the latest release of Stentor, starts it (and at every login), then opens the settings page in your browser. Sign in there with Google (a free account, once per computer), then add your API key. Running the script again reinstalls the latest release.
 
-With an AI coding agent (Claude Code, Codex, Cursor, ...): paste the prompt from [install/agent.md](install/agent.md), also at <https://hold-dictate.vercel.app/agent.md>. The agent installs it, walks you through the key, runs the checks and opens a GitHub issue for anything it can't fix.
+With an AI coding agent (Claude Code, Codex, Cursor, ...): paste the prompt from [install/agent.md](install/agent.md), also at <https://stentor-app.vercel.app/agent.md>. The agent installs it, walks you through the key, runs the checks and opens a GitHub issue for anything it can't fix.
 
-Manual install: `uv tool install --python 3.13 git+https://github.com/Can-0f-Tuna/hold-dictate`, then `hold-dictate service install` and `hold-dictate settings`.
+Manual install: `uv tool install --python 3.13 git+https://github.com/Can-0f-Tuna/stentor`, then `stentor service install` and `stentor settings`.
 
 ## Settings
 
-A local page at `http://127.0.0.1:47811` that only this computer can open. Open it from the tray icon next to the clock (Windows), the menu-bar icon (macOS), **hold-dictate settings** in the app menu (Linux), or `hold-dictate settings`. It sets:
+A local page at `http://127.0.0.1:47811` that only this computer can open. Open it from the tray icon next to the clock (Windows), the menu-bar icon (macOS), **Stentor settings** in the app menu (Linux), or `stentor settings`. It sets:
 
 - speech service and API key (with a check that the key works)
 - the model: Automatic uses the one we recommend for that service; **Choose another** lets you pick one
@@ -38,22 +38,22 @@ A local page at `http://127.0.0.1:47811` that only this computer can open. Open 
 - text clean-up: drop phrases Whisper invents from noise ("Thanks for watching", on by default), remove filler words (um, uh, אה, אממ), turn spoken punctuation into symbols ("comma" / "פסיק", "new line" / "שורה חדשה"), and your own word replacements (a Hebrew word also matches with a joined prefix: "ורסל" → "Vercel" turns "בורסל" into "ב-Vercel")
 - pasting: press Enter after pasting, and rules per app (paste without Enter, paste and press Enter, Ctrl+Shift+V, copy only, or do nothing). The page shows the last dictation and which app it went to
 - history: how long dictations are kept (see [History](#history)), with search, copy, delete and clear
-- health: the same checks as `hold-dictate doctor`, with one fix for each failed item and a **Check again** button. On macOS it names the permission that is missing. It looks only at this computer, so the key is checked as saved; **Check and save** under Transcription tries it with the service
-- a text hook (Advanced): a shell command that gets the text on stdin; what it prints is pasted instead, empty output keeps the text, exit code 77 pastes nothing. It has 5 seconds and sees `HOLD_DICTATE_APP` and `HOLD_DICTATE_PROVIDER`
+- health: the same checks as `stentor doctor`, with one fix for each failed item and a **Check again** button. On macOS it names the permission that is missing. It looks only at this computer, so the key is checked as saved; **Check and save** under Transcription tries it with the service
+- a text hook (Advanced): a shell command that gets the text on stdin; what it prints is pasted instead, empty output keeps the text, exit code 77 pastes nothing. It has 5 seconds and sees `STENTOR_APP` and `STENTOR_PROVIDER`
 
-Changes apply immediately; no restart needed. Prefer the terminal? `hold-dictate setup` still works.
+Changes apply immediately; no restart needed. Prefer the terminal? `stentor setup` still works.
 
 ## History
 
 Dictations that were pasted are kept in `history.json`, beside `config.toml`: the final text, what was heard, the time and the app. Audio is never kept, and the file never leaves your computer. It is readable only by you on Linux and macOS.
 
-Keep them for 1, 7 (the default), 30, 90 or 365 days, or Off. A new install starts at 7 days. If you used hold-dictate before history existed it stays Off until you turn it on. The newest 2000 entries and 4 MB are kept at most, and the oldest go first.
+Keep them for 1, 7 (the default), 30, 90 or 365 days, or Off. A new install starts at 7 days. If you used Stentor before history existed it stays Off until you turn it on. The newest 2000 entries and 4 MB are kept at most, and the oldest go first.
 
-Off stops saving new dictations and deletes nothing. **Clear all**, or `hold-dictate history clear`, deletes them. Apps with a copy-only or do-nothing rule are never saved, nor is text a hook stops, a paste that failed, or a recording made with an extension's second shortcut. `paste-last` and `copy-last` don't use the file: they work from memory, with history on or off.
+Off stops saving new dictations and deletes nothing. **Clear all**, or `stentor history clear`, deletes them. Apps with a copy-only or do-nothing rule are never saved, nor is text a hook stops, a paste that failed, or a recording made with an extension's second shortcut. `paste-last` and `copy-last` don't use the file: they work from memory, with history on or off.
 
 ## Updates
 
-hold-dictate checks GitHub every 10 minutes and, while you are not dictating, installs a newer release and restarts itself. Turn this off in the settings. When an update is waiting (automatic updates off, or the install failed), the recording pill on Linux shows a small **!** tab; click it to install, or run `hold-dictate update`. Releases are made by pushing a tag that matches `__version__` in `src/hold_dictate/__init__.py`:
+Stentor checks GitHub every 10 minutes and, while you are not dictating, installs a newer release and restarts itself. Turn this off in the settings. When an update is waiting (automatic updates off, or the install failed), the recording pill on Linux shows a small **!** tab; click it to install, or run `stentor update`. Releases are made by pushing a tag that matches `__version__` in `src/stentor/__init__.py`:
 
 ```sh
 git tag v0.8.3 && git push origin v0.8.3
@@ -68,7 +68,7 @@ The Release workflow runs the tests and publishes the GitHub release, not yet ma
 | **Groq** (recommended) | free tier | Whisper large-v3, about 1 s. Key: <https://console.groq.com/keys> |
 | OpenAI | paid | Key: <https://platform.openai.com/api-keys> |
 | Custom | varies | Any server with an OpenAI-style `/audio/transcriptions` endpoint |
-| Local | free | Offline via faster-whisper. Install with `hold-dictate offline`, or the button on the settings page |
+| Local | free | Offline via faster-whisper. Install with `stentor offline`, or the button on the settings page |
 
 Getting a Groq key: open the link above, sign in, click **Create API Key**, copy it and paste it into the settings page. The key is stored in your user config file (permissions 600 on Linux and macOS). It leaves your computer only in requests to the provider. Free-tier limits change; see Groq's rate-limit page.
 
@@ -78,19 +78,19 @@ If the cloud request fails and the `local` extra is installed, it falls back to 
 
 | Command | Does |
 | --- | --- |
-| `hold-dictate settings` | Opens the settings page |
-| `hold-dictate setup` | Guided setup in the terminal (safe to run again) |
-| `hold-dictate doctor` | Checks microphone, keyboard access, paste helpers and API key. `--offline` stays on this computer, `--json` is for scripts |
-| `hold-dictate history` | Lists saved dictations. Also `history search WORDS`, `history delete ID`, `history clear` |
-| `hold-dictate transcribe FILE.wav` | Transcribes a file |
-| `hold-dictate service install\|uninstall\|status` | Start at login |
-| `hold-dictate update` | Installs the latest release now |
-| `hold-dictate paste-last` | Pastes the last dictation again (bind it to a key in your compositor or desktop) |
-| `hold-dictate dictation start\|stop\|toggle` | Starts or stops a recording, as the hotkey would. For a key bound in your desktop's own keyboard settings |
-| `hold-dictate copy-last` | Copies the last dictation to the clipboard (also in the tray menu) |
-| `hold-dictate config` | Prints the config file path |
+| `stentor settings` | Opens the settings page |
+| `stentor setup` | Guided setup in the terminal (safe to run again) |
+| `stentor doctor` | Checks microphone, keyboard access, paste helpers and API key. `--offline` stays on this computer, `--json` is for scripts |
+| `stentor history` | Lists saved dictations. Also `history search WORDS`, `history delete ID`, `history clear` |
+| `stentor transcribe FILE.wav` | Transcribes a file |
+| `stentor service install\|uninstall\|status` | Start at login |
+| `stentor update` | Installs the latest release now |
+| `stentor paste-last` | Pastes the last dictation again (bind it to a key in your compositor or desktop) |
+| `stentor dictation start\|stop\|toggle` | Starts or stops a recording, as the hotkey would. For a key bound in your desktop's own keyboard settings |
+| `stentor copy-last` | Copies the last dictation to the clipboard (also in the tray menu) |
+| `stentor config` | Prints the config file path |
 
-Settings live in a TOML file: `~/.config/hold-dictate/config.toml` (Linux), `~/Library/Application Support/hold-dictate/config.toml` (macOS), `%APPDATA%\hold-dictate\config.toml` (Windows). Options: `provider`, `api_key`, `base_url`, `model`, `languages` (comma-separated codes such as `"he,en"`; empty means any language), `prompt`, `hotkey`, `hotkey_mode` (`hold`, `auto` or `toggle`), `silence_stop` (seconds, 0 = off), `live_text`, `local_model`, `local_fallback`, `beeps`, `background_audio` (`lower`, `mute` or `off`), `min_hold`, `timeout`, `auto_update`, `desktop_indicator` (the pill on macOS and Windows), `overlay_style`, `overlay_bg`, `overlay_bars`, `overlay_position`, `overlay_size`, `drop_hallucinations`, `remove_fillers`, `filler_words` (comma-separated, empty = built-in), `spoken_punctuation`, `word_overrides` (a table: `{ "get hub" = "GitHub" }`), `history_days` (0 = off), `auto_submit`, `app_rules` (a table: `{ "slack" = "submit", "keepassxc" = "off" }`; values `paste`, `submit`, `shift`, `clipboard`, `off`; a name matches part of the app name), and `post_hook`.
+Settings live in a TOML file: `~/.config/stentor/config.toml` (Linux), `~/Library/Application Support/stentor/config.toml` (macOS), `%APPDATA%\stentor\config.toml` (Windows). Options: `provider`, `api_key`, `base_url`, `model`, `languages` (comma-separated codes such as `"he,en"`; empty means any language), `prompt`, `hotkey`, `hotkey_mode` (`hold`, `auto` or `toggle`), `silence_stop` (seconds, 0 = off), `live_text`, `local_model`, `local_fallback`, `beeps`, `background_audio` (`lower`, `mute` or `off`), `min_hold`, `timeout`, `auto_update`, `desktop_indicator` (the pill on macOS and Windows), `overlay_style`, `overlay_bg`, `overlay_bars`, `overlay_position`, `overlay_size`, `drop_hallucinations`, `remove_fillers`, `filler_words` (comma-separated, empty = built-in), `spoken_punctuation`, `word_overrides` (a table: `{ "get hub" = "GitHub" }`), `history_days` (0 = off), `auto_submit`, `app_rules` (a table: `{ "slack" = "submit", "keepassxc" = "off" }`; values `paste`, `submit`, `shift`, `clipboard`, `off`; a name matches part of the app name), and `post_hook`.
 
 The app is told apart by its window class on X11, Hyprland, Sway and niri, by its name on macOS and its program name on Windows. GNOME and KDE on Wayland do not say which window is focused, so per-app rules do not apply there.
 
@@ -101,8 +101,8 @@ After you let go, the microphone stays on for 200 ms, because the last word ofte
 ## Per-OS notes
 
 - **macOS**: allow Microphone and Accessibility / Input Monitoring when prompted. `alt` is the Option key. The recording pill is on by default: it shows the recording with its live level, the work after it, and problems. It never takes the keyboard, clicks go through it, and it stays out of the Dock and Cmd+Tab. So it can't open the settings as on Linux; a notification says what went wrong. It has no update tab either. Turn it off with **Show the recording pill**, and the beeps stay as you set them.
-- **Windows**: Alt+Space normally opens the window menu. hold-dictate hides that press while you dictate. The recording pill is written but has not been tried on real Windows, so it is off: turn on **Show the recording pill** in the settings (`desktop_indicator = true`) to try it. Otherwise you get the beeps.
-- **Linux**: the keyboard is read through `/dev/input`, so your user must be in the `input` group. The installer does this; log out and in once. Without that group, bind a key in your desktop's keyboard settings instead: `hold-dictate dictation toggle` on one key, or `dictation start` on its press and `dictation stop` on its release where the desktop has both (Sway: `bindsym --no-repeat F9 exec hold-dictate dictation start` and `bindsym --release F9 exec hold-dictate dictation stop`). On a Wayland desktop that has the GlobalShortcuts portal (GNOME, KDE, Hyprland), hold-dictate asks the desktop for the shortcut when it cannot read the keyboard: approve the request if the desktop shows one. The desktop may assign another key or refuse, and the settings page says what it did; on Hyprland bind `io.github.hold-dictate:dictation` in its config. GNOME keeps Alt+Space for its window menu, so pick another shortcut there, such as Ctrl+Alt+Space; the settings page says so. This path has been tried on GNOME 51, and not yet on KDE or Hyprland. `HOLD_DICTATE_HOTKEY_BACKEND=evdev`, `portal` or `pynput` picks one way. Pasting uses `wl-clipboard` + `wtype` (Wayland) or `xclip` + `xdotool` (X11). GNOME on Wayland does not accept `wtype`; install `ydotool`, or the text is left on the clipboard for you to paste. On Wayland, bind Alt+Space to a no-op in your compositor so a stray space isn't typed (niri: `Alt+Space repeat=false { spawn "true"; }`). A recording pill is shown if [quickshell](https://quickshell.org) is installed; other setups use short beeps. When something goes wrong the pill's bars settle into a flat line and turn red, and a mark appears beside it for a moment: a crossed-out microphone or network sign, or a "!". A click opens the settings, which explain it. Without the pill you get a desktop notification.
+- **Windows**: Alt+Space normally opens the window menu. Stentor hides that press while you dictate. The recording pill is written but has not been tried on real Windows, so it is off: turn on **Show the recording pill** in the settings (`desktop_indicator = true`) to try it. Otherwise you get the beeps.
+- **Linux**: the keyboard is read through `/dev/input`, so your user must be in the `input` group. The installer does this; log out and in once. Without that group, bind a key in your desktop's keyboard settings instead: `stentor dictation toggle` on one key, or `dictation start` on its press and `dictation stop` on its release where the desktop has both (Sway: `bindsym --no-repeat F9 exec stentor dictation start` and `bindsym --release F9 exec stentor dictation stop`). On a Wayland desktop that has the GlobalShortcuts portal (GNOME, KDE, Hyprland), Stentor asks the desktop for the shortcut when it cannot read the keyboard: approve the request if the desktop shows one. The desktop may assign another key or refuse, and the settings page says what it did; on Hyprland bind `io.github.stentor:dictation` in its config. GNOME keeps Alt+Space for its window menu, so pick another shortcut there, such as Ctrl+Alt+Space; the settings page says so. This path has been tried on GNOME 51, and not yet on KDE or Hyprland. `STENTOR_HOTKEY_BACKEND=evdev`, `portal` or `pynput` picks one way. Pasting uses `wl-clipboard` + `wtype` (Wayland) or `xclip` + `xdotool` (X11). GNOME on Wayland does not accept `wtype`; install `ydotool`, or the text is left on the clipboard for you to paste. On Wayland, bind Alt+Space to a no-op in your compositor so a stray space isn't typed (niri: `Alt+Space repeat=false { spawn "true"; }`). A recording pill is shown if [quickshell](https://quickshell.org) is installed; other setups use short beeps. When something goes wrong the pill's bars settle into a flat line and turn red, and a mark appears beside it for a moment: a crossed-out microphone or network sign, or a "!". A click opens the settings, which explain it. Without the pill you get a desktop notification.
 
 ## Status
 
@@ -112,7 +112,7 @@ The recording pill on macOS was run on one Intel Mac VM (macOS 26): the app, its
 
 ## What is open source
 
-This repository is the app itself, under the MIT license (see [LICENSE](LICENSE)), plus the install scripts in `install/`. It works completely on its own: no account, and nothing is sent anywhere but the speech service you pick. The website is a separate, closed project. Other packages can add to the app through the `hold_dictate.extensions` entry point group; `src/hold_dictate/extensions.py` lists what they can do.
+This repository is the app itself, under the MIT license (see [LICENSE](LICENSE)), plus the install scripts in `install/`. It works completely on its own: no account, and nothing is sent anywhere but the speech service you pick. The website is a separate, closed project. Other packages can add to the app through the `stentor.extensions` entry point group; `src/stentor/extensions.py` lists what they can do.
 
 ## Develop
 

@@ -4,9 +4,9 @@ import time
 
 import pytest
 
-from hold_dictate import config, feedback, indicator
-from hold_dictate.config import Config
-from hold_dictate.indicator import Indicator, Pill
+from stentor import config, feedback, indicator
+from stentor.config import Config
+from stentor.indicator import Indicator, Pill
 
 
 def run(pill, seconds=0.2, dt=1 / 30):
@@ -161,7 +161,7 @@ def test_on_by_default_only_on_macos(monkeypatch):
 
 @pytest.mark.skipif(sys.platform not in ("darwin", "win32"), reason="a real helper needs a real desktop")
 def test_the_real_helper_runs_every_state_and_leaves_when_the_app_does():
-    helper = subprocess.Popen([sys.executable, "-m", "hold_dictate.indicator"], stdin=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    helper = subprocess.Popen([sys.executable, "-m", "stentor.indicator"], stdin=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     for line in ("C #0a0a0b #6b80ff top 1.25 lines", "S", "L 0.80", "T", "C #0a0a0b #6b80ff bottom 1.00 dots", "S", "L 0.80", "E mic", "Q"):
         helper.stdin.write(line + "\n")
         helper.stdin.flush()

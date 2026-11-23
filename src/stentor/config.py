@@ -11,7 +11,7 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover
     import tomli as tomllib
 
-APP = "hold-dictate"
+APP = "stentor"
 
 HEBREW_PROMPT = "שלום, אני כותב בעברית ומשלב מילים באנגלית כמו pull request, GitHub ו-deploy."
 
@@ -106,14 +106,14 @@ PROVIDERS = {
         "model": "whisper-1",
         "models": [],  # any name the server knows, typed in by hand
         "keys_url": "",
-        "env": "HOLD_DICTATE_API_KEY",
+        "env": "STENTOR_API_KEY",
     },
 }
 
 
 # Models for provider = "local" (faster-whisper). The first one is what Automatic uses.
 # Installs the offline engine (faster-whisper) into this copy; the settings page has a button that runs the same.
-OFFLINE_COMMAND = "hold-dictate offline"
+OFFLINE_COMMAND = "stentor offline"
 
 LOCAL_MODELS = [
     ["small", "Good balance of speed and accuracy (about 500 MB)"],
@@ -136,7 +136,7 @@ OLD_KEYS = ("language", "sounds")  # read once by load() and then dropped; any o
 
 
 def config_dir() -> Path:
-    override = os.environ.get("HOLD_DICTATE_CONFIG_DIR")
+    override = os.environ.get("STENTOR_CONFIG_DIR")
     if override:
         return Path(override)
     if sys.platform == "win32":
@@ -202,7 +202,7 @@ class Config:
         return self.api_key if self.api_key_service in ("", self.provider) else ""
 
     def effective_key(self) -> str:
-        return self.saved_key() or os.environ.get(self.preset()["env"], "") or os.environ.get("HOLD_DICTATE_API_KEY", "")
+        return self.saved_key() or os.environ.get(self.preset()["env"], "") or os.environ.get("STENTOR_API_KEY", "")
 
     def effective_base_url(self) -> str:
         return (self.base_url or self.preset()["base_url"]).rstrip("/")
@@ -304,7 +304,7 @@ def _toml_value(value) -> str:
 def save(cfg: Config, path: Path | None = None) -> Path:
     path = path or config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["# hold-dictate settings. Edit by hand, or run `hold-dictate settings`.", ""]
+    lines = ["# Stentor settings. Edit by hand, or run `stentor settings`.", ""]
     values = asdict(cfg)
     values.update(values.pop("extra"))
     lines += [f"{k} = {_toml_value(v)}" for k, v in values.items()]

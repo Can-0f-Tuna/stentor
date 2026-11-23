@@ -5,7 +5,7 @@ import threading
 
 import pytest
 
-from hold_dictate.hotkey import EV_FORMAT, EvdevBackend, HoldDetector, parse_hotkey
+from stentor.hotkey import EV_FORMAT, EvdevBackend, HoldDetector, parse_hotkey
 
 ALT, SPACE, SHIFT = 56, 57, 42
 
@@ -87,7 +87,7 @@ def test_a_keyboard_that_comes_back_is_opened_again(tmp_path, monkeypatch):
     device = tmp_path / "event7"
     device.write_bytes(b"")
     listed = [str(device)]
-    monkeypatch.setattr("hold_dictate.hotkey.keyboard_devices", lambda: list(listed))
+    monkeypatch.setattr("stentor.hotkey.keyboard_devices", lambda: list(listed))
     backend = EvdevBackend()
     first = backend.devices[0]
     backend._drop(first)
@@ -171,7 +171,7 @@ def fake_pynput(monkeypatch):
 
 
 def test_the_os_hook_returns_before_the_recording_starts(fake_pynput):
-    from hold_dictate.hotkey import PynputBackend
+    from stentor.hotkey import PynputBackend
     release, actions = threading.Event(), []
 
     def slow(action):  # opening the microphone can wait on a macOS prompt
@@ -191,7 +191,7 @@ def test_the_os_hook_returns_before_the_recording_starts(fake_pynput):
 
 
 def test_macos_waits_for_accessibility_and_then_listens_without_a_restart(fake_pynput, monkeypatch):
-    from hold_dictate import hotkey, macos
+    from stentor import hotkey, macos
     monkeypatch.setattr(sys, "platform", "darwin")
     answers = iter([False, False, True])
     monkeypatch.setattr(hotkey, "_mac_trusted", lambda: next(answers, True))

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from hold_dictate import audio, config
-from hold_dictate.providers import TranscribeError, check_api, transcribe_api
+from stentor import audio, config
+from stentor.providers import TranscribeError, check_api, transcribe_api
 
 
 def test_config_roundtrip(tmp_path):
@@ -133,8 +133,8 @@ def test_check_api(api):
 
 
 def test_language_hints():
-    from hold_dictate.config import HEBREW_PROMPT
-    from hold_dictate.providers import language_hints
+    from stentor.config import HEBREW_PROMPT
+    from stentor.providers import language_hints
     assert language_hints(config.Config(languages="fr")) == ("fr", "")
     assert language_hints(config.Config(languages="he")) == ("he", HEBREW_PROMPT)  # unforced, short Hebrew came out as Cyrillic
     assert language_hints(config.Config(languages="he", provider="local")) == ("he", HEBREW_PROMPT)
@@ -145,7 +145,7 @@ def test_language_hints():
 
 
 def test_language_outside_the_list_is_transcribed_again(api, monkeypatch):
-    from hold_dictate import providers
+    from stentor import providers
     answers = iter([("مرحبا", "arabic", -0.3), ("שלום", "", None)])
     sent = []
     monkeypatch.setattr(providers, "_request", lambda cfg, audio, lang, prompt, fmt: sent.append((lang, fmt)) or next(answers))
@@ -156,7 +156,7 @@ def test_language_outside_the_list_is_transcribed_again(api, monkeypatch):
 
 def test_the_language_check_works_for_any_whisper_service():
     """An extension that transcribes somewhere else hands `checked` its own way of asking."""
-    from hold_dictate.providers import checked
+    from stentor.providers import checked
     cfg = config.Config(languages="he,en")
     asked = []
     replies = {"": ("Бдика", "russian", -0.6), "he": ("בדיקה", "hebrew", -0.2)}
@@ -166,7 +166,7 @@ def test_the_language_check_works_for_any_whisper_service():
 
 
 def test_a_language_on_the_list_is_left_alone(monkeypatch):
-    from hold_dictate import providers
+    from stentor import providers
     sent = []
     monkeypatch.setattr(providers, "_request", lambda cfg, audio, lang, prompt, fmt: sent.append(lang) or ("Run it.", "english", -0.8))
     assert transcribe_api(config.Config(provider="groq", api_key="k", languages="he,en"), tone(0.5)) == "Run it."
@@ -215,7 +215,7 @@ def cpuinfo(tmp_path, cores, threads):
 def test_the_local_model_gets_a_thread_per_core(tmp_path, monkeypatch, cores, threads, logical, expected):
     import os
     import sys
-    from hold_dictate.providers import physical_cores
+    from stentor.providers import physical_cores
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setattr(os, "cpu_count", lambda: logical)
     monkeypatch.setattr(os, "sched_getaffinity", lambda pid: set(range(logical)), raising=False)
@@ -241,7 +241,7 @@ def test_the_model_loads_in_the_background_once(monkeypatch):
     import threading
     import time
     import types
-    from hold_dictate.providers import LocalTranscriber
+    from stentor.providers import LocalTranscriber
     FakeWhisper.made = []
     monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=FakeWhisper))
     local = LocalTranscriber(config.Config(provider="local"))
@@ -257,8 +257,8 @@ def test_the_model_loads_in_the_background_once(monkeypatch):
 def test_a_model_that_must_be_downloaded_first_says_so(monkeypatch):
     import sys
     import types
-    from hold_dictate import providers
-    from hold_dictate.providers import LocalTranscriber
+    from stentor import providers
+    from stentor.providers import LocalTranscriber
     FakeWhisper.made = []
     monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=FakeWhisper))
     cached = {"small": False}

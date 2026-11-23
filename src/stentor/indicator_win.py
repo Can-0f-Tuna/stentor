@@ -123,9 +123,9 @@ class PillWindow:
         self.width = self.height = 1
         self.proc = WNDPROC(self.on_message)  # kept: Windows calls it for as long as the window lives
         instance = kernel32.GetModuleHandleW(None)
-        user32.RegisterClassW(ctypes.byref(WNDCLASSW(lpfnWndProc=self.proc, hInstance=instance, lpszClassName="hold-dictate-pill")))
+        user32.RegisterClassW(ctypes.byref(WNDCLASSW(lpfnWndProc=self.proc, hInstance=instance, lpszClassName="stentor-pill")))
         style = WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT
-        self.hwnd = user32.CreateWindowExW(style, "hold-dictate-pill", "hold-dictate", WS_POPUP, 0, 0, 1, 1, None, None, instance, None)
+        self.hwnd = user32.CreateWindowExW(style, "stentor-pill", "stentor", WS_POPUP, 0, 0, 1, 1, None, None, instance, None)
         if not self.hwnd:
             raise ctypes.WinError(ctypes.get_last_error())
 

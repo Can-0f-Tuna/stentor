@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from hold_dictate import cli, updater
-from hold_dictate.config import Config
+from stentor import cli, updater
+from stentor.config import Config
 
 
 class Source:
@@ -44,7 +44,7 @@ def installs(monkeypatch):
 
 def test_the_app_comes_from_a_release_archive_so_git_is_not_needed():
     assert updater.install_spec("v1.2.3", ["x11", "local", "local"]) == (
-        "hold-dictate[local,x11] @ https://github.com/Can-0f-Tuna/hold-dictate/archive/refs/tags/v1.2.3.tar.gz")
+        "stentor[local,x11] @ https://github.com/Can-0f-Tuna/stentor/archive/refs/tags/v1.2.3.tar.gz")
 
 
 def test_installs_stay_on_this_python(monkeypatch):
@@ -66,7 +66,7 @@ def test_an_update_keeps_the_offline_engine_and_the_python(installs, monkeypatch
     assert u.install() is True and u.job == "update"
     assert ran == [["uv", "tool", "install", "--force", "--python", updater.install_python(["local"]), "--with", "pro.whl",
                     updater.install_spec("v99.0.0", ["local"])]]
-    assert ran[0][-1].startswith("hold-dictate[local] @ ")
+    assert ran[0][-1].startswith("stentor[local] @ ")
 
 
 def test_installing_the_offline_engine_adds_the_extra_to_this_version(installs, monkeypatch):
@@ -104,7 +104,7 @@ def test_windows_installs_after_exit_with_the_same_command(installs, monkeypatch
     assert u.install_offline() is True and u.ready and ran == []  # the running files are locked
     script = u.windows_helper()
     assert script.startswith(f"Wait-Process -Id {updater.os.getpid()} ")
-    assert "& 'uv' 'tool' 'install' '--force' '--python' " in script and "'hold-dictate[local] @ " in script
+    assert "& 'uv' 'tool' 'install' '--force' '--python' " in script and "'stentor[local] @ " in script
     assert "Start-Process" in script and "Start-Process" not in u.windows_helper(start=False)
 
 
@@ -121,7 +121,7 @@ def test_offline_command_hands_the_install_to_the_running_app(monkeypatch, capsy
         return next(states)
     monkeypatch.setattr(cli, "_daemon", daemon)
     monkeypatch.setattr(cli.time, "sleep", lambda s: None)
-    monkeypatch.setattr("hold_dictate.settings_ui.running_url", lambda: "http://x")
+    monkeypatch.setattr("stentor.settings_ui.running_url", lambda: "http://x")
     assert cli.main(["offline"]) == 0
     assert asked == ["/api/offline/install", "/api/state", "/api/state", "/api/state"] and "is installed" in capsys.readouterr().out
 
@@ -135,7 +135,7 @@ def test_offline_command_in_a_checkout_says_what_to_install(monkeypatch, capsys)
 
 def test_the_settings_button_starts_the_install_and_shows_its_progress(tmp_path, monkeypatch):
     from test_settings import call
-    from hold_dictate.settings_ui import SettingsServer
+    from stentor.settings_ui import SettingsServer
     monkeypatch.setattr(updater, "installed_by_uv", lambda: True)
     monkeypatch.setattr(updater, "find_uv", lambda: "uv")
     u = updater.Updater(Config())
@@ -147,5 +147,5 @@ def test_the_settings_button_starts_the_install_and_shows_its_progress(tmp_path,
     finally:
         server.stop()
     assert started == [1]
-    assert state["offline"] == {"status": "", "progress": 40, "ready": False, "can_install": "", "command": "hold-dictate offline"}
+    assert state["offline"] == {"status": "", "progress": 40, "ready": False, "can_install": "", "command": "stentor offline"}
     assert state["update"]["progress"] is None  # the update section doesn't show the engine's install as an update

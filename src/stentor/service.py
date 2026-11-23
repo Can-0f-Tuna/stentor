@@ -1,4 +1,4 @@
-"""Start hold-dictate at login: systemd (Linux), a LaunchAgent (macOS), the Run key (Windows)."""
+"""Start Stentor at login: systemd (Linux), a LaunchAgent (macOS), the Run key (Windows)."""
 import os
 import shutil
 import subprocess
@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .config import config_dir
 
-LABEL = "io.github.hold-dictate"
+LABEL = "io.github.stentor"
 
 
 def _command() -> list[str]:
@@ -16,16 +16,16 @@ def _command() -> list[str]:
     if sys.platform == "win32":  # pythonw has no console window
         pythonw = Path(python).with_name("pythonw.exe")
         python = str(pythonw if pythonw.exists() else python)
-    return [python, "-m", "hold_dictate", "run"]
+    return [python, "-m", "stentor", "run"]
 
 
 def _linux_unit() -> Path:
-    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user" / "hold-dictate.service"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user" / "stentor.service"
 
 
 def _linux_desktop() -> Path:
     data = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
-    return data / "applications" / "hold-dictate-settings.desktop"
+    return data / "applications" / "stentor-settings.desktop"
 
 
 def _write_linux_desktop():
@@ -34,9 +34,9 @@ def _write_linux_desktop():
     entry.parent.mkdir(parents=True, exist_ok=True)
     python = sys.executable
     entry.write_text(
-        "[Desktop Entry]\nType=Application\nName=hold-dictate settings\n"
-        "Comment=API key, language, hotkey and look of hold-dictate\n"
-        f"Exec={python} -m hold_dictate settings --wait 5\nIcon=audio-input-microphone\n"
+        "[Desktop Entry]\nType=Application\nName=Stentor settings\n"
+        "Comment=API key, language, hotkey and look of Stentor\n"
+        f"Exec={python} -m stentor settings --wait 5\nIcon=audio-input-microphone\n"
         "Terminal=false\nCategories=Utility;Settings;\n"
     )
 
@@ -53,8 +53,8 @@ def ensure_portal_desktop_entry():
         python = python.replace(char, "\\\\" + char)
     try:
         with entry.open("x", encoding="utf-8") as file:
-            file.write("[Desktop Entry]\nType=Application\nName=hold-dictate\nNoDisplay=true\n"
-                       f'Exec="{python}" -m hold_dictate settings\nIcon=audio-input-microphone\n')
+            file.write("[Desktop Entry]\nType=Application\nName=Stentor\nNoDisplay=true\n"
+                       f'Exec="{python}" -m stentor settings\nIcon=audio-input-microphone\n')
     except FileExistsError:
         pass
 
@@ -73,12 +73,12 @@ def install() -> str:
         import winreg
         line = " ".join(f'"{c}"' if " " in c else c for c in cmd)
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as key:
-            winreg.SetValueEx(key, "hold-dictate", 0, winreg.REG_SZ, line)
+            winreg.SetValueEx(key, "stentor", 0, winreg.REG_SZ, line)
         flags = 0x00000008 | 0x08000000  # DETACHED_PROCESS | CREATE_NO_WINDOW
         subprocess.Popen(cmd, creationflags=flags, close_fds=True)
         return "Will start at every login, and is running now."
     if sys.platform == "darwin":
-        log = config_dir() / "hold-dictate.log"
+        log = config_dir() / "stentor.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         args = "".join(f"<string>{c}</string>" for c in cmd)
         plist = _mac_plist()
@@ -101,19 +101,19 @@ def install() -> str:
         return "Will start at every login, and is running now."
     _write_linux_desktop()
     if not shutil.which("systemctl"):
-        return "systemd was not found. Start `hold-dictate run` from your session's autostart instead."
+        return "systemd was not found. Start `stentor run` from your session's autostart instead."
     unit = _linux_unit()
     unit.parent.mkdir(parents=True, exist_ok=True)
     unit.write_text(
-        "[Unit]\nDescription=hold-dictate: hold a hotkey to dictate\n"
+        "[Unit]\nDescription=Stentor: hold a hotkey to dictate\n"
         "After=graphical-session.target\nPartOf=graphical-session.target\n\n"
         f"[Service]\nExecStart={' '.join(cmd)}\nRestart=on-failure\nRestartSec=5\n\n"
         "[Install]\nWantedBy=graphical-session.target\n"
     )
     _sh("systemctl", "--user", "daemon-reload")
     # restart, not just start: after a reinstall the running copy must pick up the new version
-    if _sh("systemctl", "--user", "enable", "hold-dictate.service") != 0 or _sh("systemctl", "--user", "restart", "hold-dictate.service") != 0:
-        return f"Wrote {unit}, but could not start it. Try: systemctl --user enable --now hold-dictate"
+    if _sh("systemctl", "--user", "enable", "stentor.service") != 0 or _sh("systemctl", "--user", "restart", "stentor.service") != 0:
+        return f"Wrote {unit}, but could not start it. Try: systemctl --user enable --now stentor"
     return "Will start at every login, and is running now."
 
 
@@ -122,17 +122,17 @@ def uninstall() -> str:
         import winreg
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE) as key:
-                winreg.DeleteValue(key, "hold-dictate")
+                winreg.DeleteValue(key, "stentor")
         except FileNotFoundError:
             pass
-        subprocess.run(["taskkill", "/F", "/IM", "pythonw.exe", "/FI", "WINDOWTITLE eq hold-dictate*"], capture_output=True)
+        subprocess.run(["taskkill", "/F", "/IM", "pythonw.exe", "/FI", "WINDOWTITLE eq stentor*"], capture_output=True)
         return "Autostart removed. A running copy stops at the next logout."
     if sys.platform == "darwin":
         plist = _mac_plist()
         _sh("launchctl", "bootout", f"gui/{os.getuid()}", str(plist))
         plist.unlink(missing_ok=True)
         return "Autostart removed and stopped."
-    _sh("systemctl", "--user", "disable", "--now", "hold-dictate.service")
+    _sh("systemctl", "--user", "disable", "--now", "stentor.service")
     _linux_unit().unlink(missing_ok=True)
     _linux_desktop().unlink(missing_ok=True)
     _sh("systemctl", "--user", "daemon-reload")
@@ -144,4 +144,4 @@ def status() -> str:
         return "Windows: see Task Manager for pythonw.exe; autostart is in HKCU\\...\\Run."
     if sys.platform == "darwin":
         return "running" if _sh("launchctl", "print", f"gui/{os.getuid()}/{LABEL}") == 0 else "not running"
-    return "running" if _sh("systemctl", "--user", "is-active", "--quiet", "hold-dictate.service") == 0 else "not running"
+    return "running" if _sh("systemctl", "--user", "is-active", "--quiet", "stentor.service") == 0 else "not running"

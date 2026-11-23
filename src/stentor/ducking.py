@@ -207,7 +207,7 @@ class Ducker:
             except Exception as e:  # never worth stopping a dictation for
                 if not self.warned:
                     self.warned = True
-                    print(f"hold-dictate: could not change the volume of other apps: {e}", file=sys.stderr, flush=True)
+                    print(f"stentor: could not change the volume of other apps: {e}", file=sys.stderr, flush=True)
 
     def duck(self):
         mode = getattr(self.cfg, "background_audio", "off")

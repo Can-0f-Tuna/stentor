@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from hold_dictate import cli, config, health
-from hold_dictate.config import Config
+from stentor import cli, config, health
+from stentor.config import Config
 
 from test_settings import call, server  # noqa: F401  (the fixture)
 
@@ -58,10 +58,10 @@ def test_a_check_that_cannot_run_says_so(server, monkeypatch):  # noqa: F811
 def mac(monkeypatch):
     def setup(access):
         monkeypatch.setattr(health.sys, "platform", "darwin")
-        monkeypatch.setattr("hold_dictate.hotkey.choose_backend", lambda quick=False: (type("B", (), {"name": "pynput"})(), ""))
+        monkeypatch.setattr("stentor.hotkey.choose_backend", lambda quick=False: (type("B", (), {"name": "pynput"})(), ""))
         monkeypatch.setattr(health, "mac_access", lambda: access)
         monkeypatch.setattr(health, "_app_rows", lambda: None)
-        monkeypatch.setattr("hold_dictate.macos.grantee", lambda: ("python3.12", "/opt/py/bin/python3.12"))
+        monkeypatch.setattr("stentor.macos.grantee", lambda: ("python3.12", "/opt/py/bin/python3.12"))
         return health.checks(Config(background_audio="off", provider="local"), online=False)
     return setup
 
@@ -88,14 +88,14 @@ def test_doctor_in_a_terminal_asks_the_running_app_for_its_permissions(server, m
     """In Terminal macOS answers for Terminal; the running app knows its own."""
     import types
     monkeypatch.setattr(health.sys, "platform", "darwin")
-    monkeypatch.setattr("hold_dictate.hotkey.choose_backend", lambda quick=False: (type("B", (), {"name": "pynput"})(), ""))
+    monkeypatch.setattr("stentor.hotkey.choose_backend", lambda quick=False: (type("B", (), {"name": "pynput"})(), ""))
     monkeypatch.setattr(health, "mac_access", lambda: {"Accessibility": False, "Microphone": False})  # the terminal's
     app_rows = [{"ok": True, "text": "macOS Accessibility permission for python3.12", "fix": ""},
                 {"ok": True, "text": "microphone found", "fix": ""}]
     monkeypatch.setattr(health.subprocess, "run", lambda *a, **kw: types.SimpleNamespace(stdout=json.dumps({"ok": True, "checks": app_rows})))
     rows = health.checks(Config(background_audio="off", provider="local"), online=False)
     perms = [r for r in rows if r["text"].startswith("macOS ")]
-    assert perms == [{"ok": True, "text": "macOS Accessibility permission for python3.12, in the running hold-dictate", "fix": ""}]
+    assert perms == [{"ok": True, "text": "macOS Accessibility permission for python3.12, in the running Stentor", "fix": ""}]
     monkeypatch.setenv(health.CHILD, "1")  # the app's own checks look for themselves
     rows = health.checks(Config(background_audio="off", provider="local"), online=False)
     assert [r["ok"] for r in rows if r["text"].startswith("macOS ")] == [False, False]

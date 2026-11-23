@@ -2,9 +2,9 @@ import json
 import os
 import subprocess
 
-from hold_dictate import ducking
-from hold_dictate.config import Config
-from hold_dictate.ducking import Ducker
+from stentor import ducking
+from stentor.config import Config
+from stentor.ducking import Ducker
 
 from test_app import FakeFeedback, FakeRecorder
 
@@ -92,7 +92,7 @@ def test_a_failing_backend_does_not_break_dictation(capsys):
 
 
 def test_dictation_ducks_while_recording(api):
-    from hold_dictate.app import Dictation
+    from stentor.app import Dictation
     fake = FakeBackend()
     cfg = Config(provider="custom", base_url=api.url, api_key="k", min_hold=0.0)
     d = Dictation(cfg, FakeFeedback(), recorder_factory=FakeRecorder, paster=lambda t, **kw: "", focus=lambda: "", ducker=Ducker(cfg, fake.pair))

@@ -4,7 +4,7 @@ import types
 
 import pytest
 
-from hold_dictate import macos
+from stentor import macos
 
 
 class Item:

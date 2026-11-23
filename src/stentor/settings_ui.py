@@ -19,9 +19,9 @@ from . import __version__, config as cfgmod, ducking, extensions, health, histor
 from .config import APP_RULES, DUCK_MODES, HISTORY_DAYS, HOTKEY_MODES, LANGUAGES, LOCAL_MODELS, OFFLINE_COMMAND, OVERLAY_STYLES, PROVIDERS, Config
 
 PAGE = Path(__file__).with_name("settings.html")
-REOPEN = {"linux": "from your app menu (hold-dictate settings)", "darwin": "from the hold-dictate icon in the menu bar"}
+REOPEN = {"linux": "from your app menu (Stentor settings)", "darwin": "from the Stentor icon in the menu bar"}
 STALE_PAGE = f"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark"><title>hold-dictate settings</title>
+<meta name="color-scheme" content="light dark"><title>Stentor settings</title>
 <style>
 @font-face {{ font-family:"Geist"; src:url(/fonts/geist.woff2) format("woff2"); font-weight:100 900; }}
 :root {{ --paper:#fcfcfb; --ink:#0c0c0d; --muted:#6a6a6f; --soft:#f2f2ef; --line:#e7e7e3; }}
@@ -33,9 +33,9 @@ h1 {{ margin:0 0 12px; font-size:32px; font-weight:600; letter-spacing:-.02em; l
 p {{ margin:0; color:var(--muted); font-size:17px; }}
 code {{ font:500 .9em ui-monospace,Menlo,Consolas,monospace; background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:1px 5px; color:var(--ink); }}
 </style>
-<main><div class="brand"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="#000"/><rect x="3.5" y="2.5" width="25" height="23" rx="6" fill="#232326"/><g fill="#fff"><rect x="8" y="12" width="2.6" height="4" rx="1.3"/><rect x="12.4" y="9" width="2.6" height="10" rx="1.3"/><rect x="16.8" y="6.5" width="2.6" height="15" rx="1.3" fill="#5b74ff"/><rect x="21.2" y="10.5" width="2.6" height="7" rx="1.3"/></g></svg>hold-dictate</div>
+<main><div class="brand"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="#000"/><rect x="3.5" y="2.5" width="25" height="23" rx="6" fill="#232326"/><g fill="#fff"><rect x="8" y="12" width="2.6" height="4" rx="1.3"/><rect x="12.4" y="9" width="2.6" height="10" rx="1.3"/><rect x="16.8" y="6.5" width="2.6" height="15" rx="1.3" fill="#5b74ff"/><rect x="21.2" y="10.5" width="2.6" height="7" rx="1.3"/></g></svg>Stentor</div>
 <h1>This settings link has expired.</h1>
-<p>Open the settings again {REOPEN.get("linux" if sys.platform.startswith("linux") else sys.platform, "from the hold-dictate icon next to the clock")}, or run <code>hold-dictate settings</code> in a terminal.</p></main>
+<p>Open the settings again {REOPEN.get("linux" if sys.platform.startswith("linux") else sys.platform, "from the Stentor icon next to the clock")}, or run <code>stentor settings</code> in a terminal.</p></main>
 """.encode("utf-8")
 
 
@@ -50,16 +50,16 @@ def runtime_file() -> Path:
     return cfgmod.config_dir() / "settings-server.json"
 
 
-SETTINGS_TITLE = "hold-dictate settings"  # the page's <title>
+SETTINGS_TITLE = "Stentor settings"  # the page's <title>
 
 
 def running_url(timeout: float = 1.0) -> str:
-    """URL of the settings page of the hold-dictate that is running now, or ''."""
+    """URL of the settings page of the Stentor that is running now, or ''."""
     try:
         info = json.loads(runtime_file().read_text(encoding="utf-8"))
         request = urllib.request.Request(f"http://127.0.0.1:{info['port']}/api/ping", headers={"X-Token": info["token"]})
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            if json.load(response).get("app") == "hold-dictate":
+            if json.load(response).get("app") == "stentor":
                 return f"http://127.0.0.1:{info['port']}/?t={info['token']}"
     except Exception:
         pass
@@ -68,7 +68,7 @@ def running_url(timeout: float = 1.0) -> str:
 
 def saved_token() -> str:
     """The token of the previous run. Keeping it means a settings tab left open still works after
-    hold-dictate restarts, for example after an update."""
+    Stentor restarts, for example after an update."""
     try:
         token = json.loads(runtime_file().read_text(encoding="utf-8")).get("token", "")
         return token if isinstance(token, str) and len(token) >= 24 else ""
@@ -77,7 +77,7 @@ def saved_token() -> str:
 
 
 class SettingsServer:
-    """daemon=True when it runs inside `hold-dictate run`; False for the stand-alone `settings` command."""
+    """daemon=True when it runs inside `stentor run`; False for the stand-alone `settings` command."""
 
     def __init__(self, cfg: Config, on_saved=None, updater=None, daemon: bool = True, port: int = PORT, session=None):
         self.cfg = cfg
@@ -251,13 +251,13 @@ class SettingsServer:
 
     def last(self, action: str) -> dict:
         if not self.session:
-            return {"message": "hold-dictate is not running"}
+            return {"message": "Stentor is not running"}
         note = self.session.copy_last() if action == "copy" else self.session.paste_last()
         return {"message": note or ""}
 
     def dictation(self, action: str) -> dict:
         if not self.session:
-            return {"message": "hold-dictate is not running"}
+            return {"message": "Stentor is not running"}
         self.session.command(action)
         return {"message": ""}
 
@@ -299,7 +299,7 @@ class SettingsServer:
 
 class _Handler(BaseHTTPRequestHandler):
     app: SettingsServer
-    server_version = "hold-dictate"
+    server_version = "stentor"
 
     def log_message(self, *args):
         pass
@@ -344,7 +344,7 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._allowed(self.headers.get("X-Token", "")):
             return self._json({"error": "forbidden"}, 403)
         if path == "/api/ping":
-            return self._json({"app": "hold-dictate", "version": __version__})
+            return self._json({"app": "stentor", "version": __version__})
         if path == "/api/state":
             return self._json(self.app.state())
         if path == "/api/health":

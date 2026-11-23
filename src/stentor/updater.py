@@ -15,10 +15,10 @@ from pathlib import Path
 
 from . import __version__, extensions
 
-REPO = "Can-0f-Tuna/hold-dictate"
+REPO = "Can-0f-Tuna/stentor"
 LATEST_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
-# The release's source as an archive, so installing needs no git. HOLD_DICTATE_CORE_URL tries a build elsewhere.
-CORE_URL = os.environ.get("HOLD_DICTATE_CORE_URL") or f"https://github.com/{REPO}/archive/refs/tags/{{tag}}.tar.gz"
+# The release's source as an archive, so installing needs no git. STENTOR_CORE_URL tries a build elsewhere.
+CORE_URL = os.environ.get("STENTOR_CORE_URL") or f"https://github.com/{REPO}/archive/refs/tags/{{tag}}.tar.gz"
 # The newest Python that every library of the offline engine has wheels for on macOS (Intel and Apple), Windows
 # and Linux: onnxruntime, which faster-whisper needs, stops at 3.13 on Intel Macs. The install scripts use it too.
 OFFLINE_PYTHON = (3, 13)
@@ -55,7 +55,7 @@ def find_uv() -> str | None:
 def installed_by_uv() -> bool:
     """True when running from `uv tool install` (a venv in uv's tools folder), not a dev checkout."""
     prefix = Path(sys.prefix)
-    return (prefix / "uv-receipt.toml").exists() or (prefix.name == "hold-dictate" and prefix.parent.name == "tools")
+    return (prefix / "uv-receipt.toml").exists() or (prefix.name == "stentor" and prefix.parent.name == "tools")
 
 
 def installed_extras() -> list[str]:
@@ -71,7 +71,7 @@ def installed_extras() -> list[str]:
 def install_spec(tag: str, extras=None) -> str:
     """The app at `tag`, with `extras` (default: the ones installed now)."""
     extras = installed_extras() if extras is None else sorted(set(extras))
-    name = f"hold-dictate[{','.join(extras)}]" if extras else "hold-dictate"
+    name = f"stentor[{','.join(extras)}]" if extras else "stentor"
     return f"{name} @ {CORE_URL.format(tag=tag)}"
 
 
@@ -103,14 +103,14 @@ def run_command() -> list[str]:
     if sys.platform == "win32":
         pythonw = Path(python).with_name("pythonw.exe")
         python = str(pythonw if pythonw.exists() else python)
-    return [python, "-m", "hold_dictate", "run"]
+    return [python, "-m", "stentor", "run"]
 
 
 class GitHub:
     """Where updates come from unless an extension says otherwise: this repository's latest release."""
 
     def latest(self) -> str:
-        request = urllib.request.Request(LATEST_URL, headers={"User-Agent": "hold-dictate", "Accept": "application/vnd.github+json"})
+        request = urllib.request.Request(LATEST_URL, headers={"User-Agent": "stentor", "Accept": "application/vnd.github+json"})
         with urllib.request.urlopen(request, timeout=10) as response:
             return json.load(response)["tag_name"]
 
@@ -260,7 +260,7 @@ class Updater:
         )
         if start:
             cmd = run_command()
-            script += f"Start-Process -FilePath {quote(cmd[0])} -ArgumentList '-m','hold_dictate','run'"
+            script += f"Start-Process -FilePath {quote(cmd[0])} -ArgumentList '-m','stentor','run'"
         return script
 
     def restart(self):
@@ -275,7 +275,7 @@ class Updater:
             subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", self.windows_helper()], creationflags=flags, close_fds=True)
             os._exit(0)
         if changed:
-            os.environ["HOLD_DICTATE_UPDATED"] = self.latest  # the new version finishes the pill's update chip
+            os.environ["STENTOR_UPDATED"] = self.latest  # the new version finishes the pill's update chip
         os.execv(cmd[0], cmd)
 
     def update_now(self):

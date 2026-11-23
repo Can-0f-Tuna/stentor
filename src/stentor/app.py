@@ -25,7 +25,7 @@ def transcribe(cfg: Config, local: LocalTranscriber, speech) -> tuple[str, str]:
         return transcribe_api(cfg, speech), cfg.provider
     except TranscribeError as e:
         if cfg.local_fallback and LocalTranscriber.available():
-            print(f"hold-dictate: {e}; using the local model", file=sys.stderr, flush=True)
+            print(f"stentor: {e}; using the local model", file=sys.stderr, flush=True)
             return local.transcribe(speech), "local"
         raise
 
@@ -128,7 +128,7 @@ class Dictation:
                     self.latched = True
 
     def command(self, action: str):
-        """`hold-dictate dictation start|stop|toggle`: a key bound in the desktop's own keyboard settings, for a
+        """`stentor dictation start|stop|toggle`: a key bound in the desktop's own keyboard settings, for a
         desktop where this program is not allowed to read the keyboard. The command says what it wants, so the
         hotkey mode has no say: start begins a recording, stop ends one, toggle does whichever applies."""
         with self.lock:
@@ -142,10 +142,10 @@ class Dictation:
     def _downloading(self, model: str, started: bool):
         """The first load of a model downloads it, which takes minutes: say so, or the first dictation just hangs."""
         if started:
-            print(f"hold-dictate: downloading the offline model {model}", flush=True)
+            print(f"stentor: downloading the offline model {model}", flush=True)
             self.fb.notify("Downloading the offline model. It takes a few minutes, once; dictation waits for it.")
         else:
-            print(f"hold-dictate: the offline model {model} is ready", flush=True)
+            print(f"stentor: the offline model {model} is ready", flush=True)
             self.fb.notify("The offline model is ready.")
 
     def _level(self, value: float):
@@ -361,9 +361,9 @@ class Dictation:
             text = rewrite(text, app)
         self.fb.done()
         if self.cfg.post_hook.strip():
-            text = textproc.run_hook(self.cfg.post_hook, text, {"HOLD_DICTATE_APP": app, "HOLD_DICTATE_PROVIDER": source})
+            text = textproc.run_hook(self.cfg.post_hook, text, {"STENTOR_APP": app, "STENTOR_PROVIDER": source})
             if not text:
-                print("hold-dictate: the text hook asked not to paste this", flush=True)
+                print("stentor: the text hook asked not to paste this", flush=True)
                 return
         self.last_text, self.last_app = text, app
         if self.deliver(text, app):
@@ -374,7 +374,7 @@ class Dictation:
         try:
             history.add(self.cfg, text, raw, app)
         except Exception as e:  # the text is already where it belongs
-            print(f"hold-dictate: could not save to the history: {e}", file=sys.stderr, flush=True)
+            print(f"stentor: could not save to the history: {e}", file=sys.stderr, flush=True)
 
     def process_second(self, work, recording):
         """The second hotkey's recording, in the hands of the extension that added it."""
@@ -453,17 +453,17 @@ def run(cfg: Config) -> int:
     from .updater import Updater
 
     if running_url():
-        print("hold-dictate is already running. Open its settings with `hold-dictate settings`.", flush=True)
+        print("Stentor is already running. Open its settings with `stentor settings`.", flush=True)
         return 0
     backend, problem = choose_backend()
     if backend is None:  # keep running so the settings page still works; the hotkey waits for a restart
-        print(f"hold-dictate: {problem}", file=sys.stderr, flush=True)
+        print(f"stentor: {problem}", file=sys.stderr, flush=True)
     hotkey_problem = ""
     try:
         hotkey = parse_hotkey(cfg.hotkey)
     except ValueError as e:  # fall back to the default so the settings page can fix it
         hotkey_problem = f"The shortcut {cfg.hotkey!r} in the settings file doesn't work ({e}), so Alt + Space is used for now."
-        print(f"hold-dictate: {hotkey_problem}", file=sys.stderr, flush=True)
+        print(f"stentor: {hotkey_problem}", file=sys.stderr, flush=True)
         cfg.hotkey = Config().hotkey  # otherwise every save on the settings page would fail on it
         hotkey = parse_hotkey(cfg.hotkey)
 
@@ -525,7 +525,7 @@ def run(cfg: Config) -> int:
             nonlocal portal_notice
             portal_notice = server.hotkey_problem = text
             if text:
-                print(f"hold-dictate: {text}", file=sys.stderr, flush=True)
+                print(f"stentor: {text}", file=sys.stderr, flush=True)
 
         if isinstance(backend, PortalBackend):
             backend.on_problem = portal_problem
@@ -548,14 +548,14 @@ def run(cfg: Config) -> int:
         finally:
             if not done.is_set():
                 lost.set()
-                print("hold-dictate: the keyboard listener stopped; quitting so the login service starts it again", file=sys.stderr, flush=True)
+                print("stentor: the keyboard listener stopped; quitting so the login service starts it again", file=sys.stderr, flush=True)
             done.set()
 
     done = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: done.set())  # a clean exit, so other apps get their volume back
     if backend:
-        print(f"hold-dictate: {'hold' if cfg.hotkey_mode == 'hold' else 'tap'} {hotkey} to dictate ({cfg.provider}, keyboard via {backend.name})", flush=True)
-    print(f"hold-dictate: settings at {server.url}", flush=True)
+        print(f"stentor: {'hold' if cfg.hotkey_mode == 'hold' else 'tap'} {hotkey} to dictate ({cfg.provider}, keyboard via {backend.name})", flush=True)
+    print(f"stentor: settings at {server.url}", flush=True)
     threading.Thread(target=listen, daemon=True).start()
     try:
         if tray.available():
@@ -565,7 +565,7 @@ def run(cfg: Config) -> int:
                 threading.Thread(target=lambda: (done.wait(), icon.stop()), daemon=True).start()
                 icon.run()
             except Exception as e:  # no tray is no reason to stop dictating
-                print(f"hold-dictate: tray icon unavailable: {e}", file=sys.stderr, flush=True)
+                print(f"stentor: tray icon unavailable: {e}", file=sys.stderr, flush=True)
         while not done.wait(1):
             pass
     except KeyboardInterrupt:

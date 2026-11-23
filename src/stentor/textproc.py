@@ -181,16 +181,16 @@ def run_hook(command: str, text: str, env: dict | None = None) -> str | None:
             timeout=HOOK_TIMEOUT, env=dict(os.environ, **(env or {})),
         )
     except subprocess.TimeoutExpired:
-        print(f"hold-dictate: the text hook took over {HOOK_TIMEOUT:.0f}s; pasting the text unchanged", file=sys.stderr, flush=True)
+        print(f"stentor: the text hook took over {HOOK_TIMEOUT:.0f}s; pasting the text unchanged", file=sys.stderr, flush=True)
         return text
     except OSError as e:
-        print(f"hold-dictate: the text hook could not run ({e}); pasting the text unchanged", file=sys.stderr, flush=True)
+        print(f"stentor: the text hook could not run ({e}); pasting the text unchanged", file=sys.stderr, flush=True)
         return text
     if result.returncode == HOOK_DROP:
         return None
     if result.returncode != 0:
         detail = (result.stderr or "").strip().splitlines()[-1:] or [""]
-        print(f"hold-dictate: the text hook failed (exit {result.returncode}) {detail[0]}; pasting the text unchanged", file=sys.stderr, flush=True)
+        print(f"stentor: the text hook failed (exit {result.returncode}) {detail[0]}; pasting the text unchanged", file=sys.stderr, flush=True)
         return text
     out = result.stdout.rstrip("\r\n")
     return out if out.strip() else text

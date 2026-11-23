@@ -6,10 +6,10 @@ import urllib.request
 
 import pytest
 
-from hold_dictate import cli, config, extensions, textproc
-from hold_dictate.app import Dictation
-from hold_dictate.config import Config
-from hold_dictate.settings_ui import SettingsServer
+from stentor import cli, config, extensions, textproc
+from stentor.app import Dictation
+from stentor.config import Config
+from stentor.settings_ui import SettingsServer
 
 from test_app import FakeFeedback, FakeRecorder, Pasted, cfg_for, settle, tap
 
@@ -53,7 +53,7 @@ def test_a_broken_entry_point_is_skipped(monkeypatch, capsys):
 
     monkeypatch.setattr(extensions, "_loaded", None)
     monkeypatch.setattr(extensions, "_broken", False)
-    monkeypatch.setattr(extensions, "entry_points", lambda group: [Point(), Good()] if group == "hold_dictate.extensions" else [])
+    monkeypatch.setattr(extensions, "entry_points", lambda group: [Point(), Good()] if group == "stentor.extensions" else [])
     assert extensions.loaded() == ["the extension"]
     assert "bad" in capsys.readouterr().err and extensions._broken
 
@@ -190,7 +190,7 @@ def test_the_service_in_the_settings_takes_what_an_extension_leaves_or_fails(api
 
 
 def test_a_transcribe_error_from_an_extension_is_its_answer(api, add):
-    from hold_dictate.providers import TranscribeError
+    from stentor.providers import TranscribeError
     add(Cloud(TranscribeError("the extension's own service failed", "Can't reach it.")))
     d, out, fb = dictation(cfg_for(api))
     tap(d, 0.3)
@@ -210,7 +210,7 @@ def test_an_extension_that_transcribes_needs_no_api_key(api, add):
 
 
 def test_text_hooks_change_the_prompt_and_the_words(add):
-    from hold_dictate.providers import language_hints
+    from stentor.providers import language_hints
 
     class Words:
         def adjust_prompt(self, prompt, cfg):
@@ -225,8 +225,8 @@ def test_text_hooks_change_the_prompt_and_the_words(add):
 
 
 def test_review_transcript_can_ask_again_and_a_failed_request_is_not_hidden(add, monkeypatch):
-    from hold_dictate import providers
-    from hold_dictate.providers import TranscribeError, transcribe_api
+    from stentor import providers
+    from stentor.providers import TranscribeError, transcribe_api
     answers = [("first", "english", -0.9), ("second", "hebrew", -0.1)]
     monkeypatch.setattr(providers, "_request", lambda *a: answers.pop(0))
 
@@ -248,7 +248,7 @@ def test_review_transcript_can_ask_again_and_a_failed_request_is_not_hidden(add,
 
 
 def test_the_overlay_gets_pill_lines_before_the_recording():
-    from hold_dictate.feedback import Feedback
+    from stentor.feedback import Feedback
 
     class Lines:
         def __init__(self):
@@ -350,7 +350,7 @@ class Source:
 
 def installed_with(monkeypatch):
     """What the updater runs. It stands in for the install itself, which only runs from a uv tool folder."""
-    from hold_dictate import updater
+    from stentor import updater
     ran = []
     monkeypatch.setattr(updater, "installed_by_uv", lambda: True)
     monkeypatch.setattr(updater, "find_uv", lambda: "uv")
@@ -361,7 +361,7 @@ def installed_with(monkeypatch):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows installs at restart, through a helper")
 def test_an_update_source_decides_what_is_installed(add, monkeypatch):
-    from hold_dictate import updater
+    from stentor import updater
     add(type("Ext", (), {"update_source": lambda self: Source()})())
     u, ran = installed_with(monkeypatch)
     assert u.install() is True and ran == [["uv", "tool", "install", "--force", "--python", updater.install_python([]), "--with", "extra.whl", "core@v99.0.0"]]

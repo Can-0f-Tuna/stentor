@@ -48,7 +48,7 @@ def _explain_http_error(cfg: Config, e: urllib.error.HTTPError) -> str:
     except Exception:
         detail = e.reason
     hints = {
-        401: "the API key was rejected. Enter it again in the settings (`hold-dictate settings`).",
+        401: "the API key was rejected. Enter it again in the settings (`stentor settings`).",
         403: "access denied. Check that the key is allowed to use speech-to-text.",
         404: "endpoint or model not found. Check base_url and model in your config.",
         429: "rate limit or quota reached. Wait a bit, or switch provider.",
@@ -108,7 +108,7 @@ def _request(cfg: Config, audio, language: str, prompt: str, response_format: st
     """(text, the language it reports, its average avg_logprob or None)."""
     key, base = cfg.effective_key(), cfg.effective_base_url()
     if not key:
-        raise TranscribeError("no API key set. Add one in the settings (`hold-dictate settings`).")
+        raise TranscribeError("no API key set. Add one in the settings (`stentor settings`).")
     if not base:
         raise TranscribeError("base_url is not set for the custom provider.")
     fields = {"model": cfg.effective_model(), "response_format": response_format, "temperature": "0"}
@@ -120,7 +120,7 @@ def _request(cfg: Config, audio, language: str, prompt: str, response_format: st
     request = urllib.request.Request(
         f"{base}/audio/transcriptions",
         data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": content_type, "User-Agent": "hold-dictate"},
+        headers={"Authorization": f"Bearer {key}", "Content-Type": content_type, "User-Agent": "stentor"},
     )
     try:
         with urllib.request.urlopen(request, timeout=cfg.timeout) as response:
@@ -139,7 +139,7 @@ def check_api(cfg: Config) -> str:
     if not key:
         return "no API key set"
     request = urllib.request.Request(
-        f"{base}/models", headers={"Authorization": f"Bearer {key}", "User-Agent": "hold-dictate"}
+        f"{base}/models", headers={"Authorization": f"Bearer {key}", "User-Agent": "stentor"}
     )
     try:
         urllib.request.urlopen(request, timeout=cfg.timeout).close()
@@ -213,7 +213,7 @@ class LocalTranscriber:
                 with self.lock:
                     self.load()
             except Exception as e:  # the dictation reports it
-                print(f"hold-dictate: the local model didn't load yet: {e}", file=sys.stderr, flush=True)
+                print(f"stentor: the local model didn't load yet: {e}", file=sys.stderr, flush=True)
         threading.Thread(target=run, daemon=True).start()
 
     @staticmethod

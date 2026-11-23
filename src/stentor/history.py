@@ -32,7 +32,7 @@ def days(cfg) -> float:
 
 @contextmanager
 def _locked():
-    """One at a time, across processes: `hold-dictate history` and the settings page run beside the app."""
+    """One at a time, across processes: `stentor history` and the settings page run beside the app."""
     path().parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path().with_name("history.lock"), os.O_RDWR | os.O_CREAT, 0o600)
     try:
@@ -64,7 +64,7 @@ def _read() -> list:
     except FileNotFoundError:
         return []
     except (ValueError, AttributeError) as e:
-        print(f"hold-dictate: the history file can't be read, starting a new one: {e}", file=sys.stderr, flush=True)
+        print(f"stentor: the history file can't be read, starting a new one: {e}", file=sys.stderr, flush=True)
         return []
     return [row for row in rows if _good(row)] if isinstance(rows, list) else []
 

@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from hold_dictate import hotkey, portal_hotkey
-from hold_dictate.hotkey import HoldDetector, parse_hotkey
-from hold_dictate.portal_hotkey import PortalBackend, PortalRefused
+from stentor import hotkey, portal_hotkey
+from stentor.hotkey import HoldDetector, parse_hotkey
+from stentor.portal_hotkey import PortalBackend, PortalRefused
 
 
 class FakePortal:
@@ -214,7 +214,7 @@ def test_hyprland_binds_by_name_so_the_id_never_changes(listener, monkeypatch):
     actions, notices, _ = listener(detector, {}, [("Activated", "dictation"), ("Deactivated", "dictation")])
     assert listener.portal.asked == [["dictation"]]
     assert actions[:2] == ["start", "stop"]
-    assert "io.github.hold-dictate:dictation" in notices[-1]
+    assert "io.github.stentor:dictation" in notices[-1]
 
 
 @pytest.mark.parametrize("wayland,portal,evdev,display,forced,expected", [
@@ -235,7 +235,7 @@ def test_linux_backend_order_and_override(monkeypatch, wayland, portal, evdev, d
         "XDG_SESSION_TYPE": "wayland" if wayland else "x11",
         "WAYLAND_DISPLAY": "wayland-1" if wayland else None,
         "DISPLAY": ":1" if display else None,
-        "HOLD_DICTATE_HOTKEY_BACKEND": forced,
+        "STENTOR_HOTKEY_BACKEND": forced,
     }.items():
         if value is None:
             monkeypatch.delenv(name, raising=False)

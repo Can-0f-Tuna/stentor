@@ -14,7 +14,7 @@ from .config import pill_available
 
 QML = Path(__file__).with_name("overlay.qml")
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
-EVENTS_FILE = os.path.join(RUNTIME, "hold-dictate.events")
+EVENTS_FILE = os.path.join(RUNTIME, "stentor.events")
 
 
 def _stop_stale_overlays(keep=None):
@@ -25,7 +25,7 @@ def _stop_stale_overlays(keep=None):
             continue
         try:
             argv = (entry / "cmdline").read_bytes().split(b"\0")
-            if entry.stat().st_uid == os.getuid() and argv[0].endswith(b"quickshell") and argv[2].endswith(b"hold_dictate/overlay.qml"):
+            if entry.stat().st_uid == os.getuid() and argv[0].endswith(b"quickshell") and argv[2].endswith(b"stentor/overlay.qml"):
                 os.kill(int(entry.name), 15)
         except (OSError, IndexError):
             pass
@@ -51,7 +51,7 @@ class Feedback:
         self.last_problem = None  # what went wrong last, for the settings page
         if pill_available():
             self.events = open(EVENTS_FILE, "w", buffering=1)
-            updated = os.environ.pop("HOLD_DICTATE_UPDATED", "")
+            updated = os.environ.pop("STENTOR_UPDATED", "")
             if not updated:
                 _stop_stale_overlays()
             self._ensure_overlay()
@@ -68,8 +68,8 @@ class Feedback:
         if self.proc and self.proc.poll() is None:
             return
         try:
-            # the "!" tab runs `hold-dictate update`
-            env = dict(os.environ, HOLD_DICTATE_PYTHON=sys.executable, HOLD_DICTATE_NOTICES=":".join(extensions.notices()))
+            # the "!" tab runs `stentor update`
+            env = dict(os.environ, STENTOR_PYTHON=sys.executable, STENTOR_NOTICES=":".join(extensions.notices()))
             self.proc = subprocess.Popen(
                 ["quickshell", "-p", str(QML)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env
             )
@@ -138,7 +138,7 @@ class Feedback:
         """The pill's bars lie flat and turn red, with a mark beside them; its click opens the settings, which
         explain with `brief`, or else the message. The log always gets the message."""
         self._beep("error")
-        print(f"hold-dictate: {message}", file=sys.stderr, flush=True)
+        print(f"stentor: {message}", file=sys.stderr, flush=True)
         shown = " ".join((brief or message).split())
         shown = shown[:1].upper() + shown[1:]
         self.last_problem = {"brief": shown, "detail": "" if message.lower() == shown.lower() else message}
@@ -158,9 +158,9 @@ class Feedback:
         try:
             if sys.platform == "darwin":
                 safe = message.replace('"', "'")
-                subprocess.run(["/usr/bin/osascript", "-e", f'display notification "{safe}" with title "hold-dictate"'], timeout=3,
+                subprocess.run(["/usr/bin/osascript", "-e", f'display notification "{safe}" with title "stentor"'], timeout=3,
                                close_fds=False)  # posix_spawn, not fork (see macos.spawn_options)
             elif sys.platform.startswith("linux") and shutil.which("notify-send"):
-                subprocess.run(["notify-send", "hold-dictate", message], timeout=3)
+                subprocess.run(["notify-send", "stentor", message], timeout=3)
         except Exception:
             pass

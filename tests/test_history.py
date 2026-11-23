@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from hold_dictate import cli, config, history, settings_ui
-from hold_dictate.config import Config
-from hold_dictate.settings_ui import SettingsServer
+from stentor import cli, config, history, settings_ui
+from stentor.config import Config
+from stentor.settings_ui import SettingsServer
 
 from test_app import FakeRecorder, cfg_for, dictation, settle, tap
 from test_settings import call, server  # noqa: F401  (the fixture)
@@ -78,7 +78,7 @@ def test_a_failed_paste_is_not_saved(api):
 
 
 def test_text_typed_live_is_saved_once_it_is_all_out(api):
-    from hold_dictate.live import LiveTyper
+    from stentor.live import LiveTyper
     d, out, _ = dictation(cfg_for(api), app="slack")
     live = LiveTyper(None, None, str, lambda text: "")
     d.process_live(FakeRecorder(None).stop(), live, 32000, "slack")
@@ -241,7 +241,7 @@ def test_an_existing_user_can_turn_it_on_and_it_stays_on(tmp_path):
 def test_list_search_copy_delete_clear_through_the_page(server, monkeypatch):  # noqa: F811
     seed("buy milk", "call Dana")
     copied = []
-    monkeypatch.setattr("hold_dictate.paste.copy_text", lambda text: copied.append(text) or "")
+    monkeypatch.setattr("stentor.paste.copy_text", lambda text: copied.append(text) or "")
     _, listed = call(server, "/api/history", {})
     assert [e["text"] for e in listed["entries"]] == ["call Dana", "buy milk"] and listed["total"] == 2
     _, found = call(server, "/api/history", {"q": "MILK"})

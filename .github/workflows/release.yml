@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Tag matches the version in the code
         run: |
-          code=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/hold_dictate/__init__.py)
+          code=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/stentor/__init__.py)
           test "v$code" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME but __version__ is $code"; exit 1; }
       - uses: actions/setup-python@v5
         with: { python-version: "3.13" }

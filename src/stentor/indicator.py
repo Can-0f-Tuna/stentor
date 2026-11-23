@@ -50,11 +50,11 @@ class Indicator:
         self.starts += 1
         try:
             self.proc = subprocess.Popen(
-                [sys.executable, "-m", "hold_dictate.indicator"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                [sys.executable, "-m", "stentor.indicator"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                 text=True, bufsize=1, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except OSError as e:
-            print(f"hold-dictate: the recording pill didn't start: {e}", file=sys.stderr, flush=True)
+            print(f"stentor: the recording pill didn't start: {e}", file=sys.stderr, flush=True)
 
     def _pump(self):
         """Its own thread: starting the helper, and writing to one that is stuck, can both take a while."""
