@@ -121,9 +121,8 @@ class GitHub:
                 and re.fullmatch(r"v\d+\.\d+\.\d+", release["tag_name"])
                 and parse_version(release["tag_name"]) >= FIRST_STENTOR_VERSION
             ]
-        if not tags:
-            raise ValueError("no Stentor releases found")
-        return max(tags, key=parse_version)
+        # None yet: the newest one is still a pre-release, waiting to be made stable. Nothing to install.
+        return max(tags, key=parse_version) if tags else f"v{__version__}"
 
     def install_args(self, tag: str, extras=None) -> list[str]:
         return [install_spec(tag, extras)]

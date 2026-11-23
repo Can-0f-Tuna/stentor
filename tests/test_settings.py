@@ -187,6 +187,11 @@ def test_core_alone_updates_from_the_latest_github_release(monkeypatch):
         "https://api.github.com/repos/Can-0f-Tuna/stentor/releases?per_page=100"
     ]
     assert u.source.install_args("v99.0.0") == [updater.install_spec("v99.0.0")]
+    # Between the tag and making it stable there is no Stentor release yet: that is up to date, not a failure.
+    only_old = b'[{"tag_name": "v0.9.4", "draft": false, "prerelease": false}, {"tag_name": "v99.0.0", "draft": false, "prerelease": true}]'
+    monkeypatch.setattr(updater.urllib.request, "urlopen", lambda request, timeout: Reply(only_old))
+    assert not u.check() or not u.available()
+    assert u.status == "up to date"
     monkeypatch.setattr(updater.urllib.request, "urlopen", lambda request, timeout: Reply(b"not json"))
     assert u.check() == "" and "could not check" in u.status
 
