@@ -307,6 +307,17 @@ def cmd_last(args) -> int:
     return 0
 
 
+def cmd_dictation(args) -> int:
+    """Starts or stops a recording in the running hold-dictate, as its hotkey would. For a desktop where it cannot
+    read the keyboard: bind `dictation start` to a key's press and `dictation stop` to its release, or `dictation
+    toggle` to one key, in the desktop's own keyboard settings."""
+    result = _daemon(f"/api/dictation/{args.action}")
+    if result is None:
+        print("hold-dictate is not running.")
+        return 1
+    return 0
+
+
 def cmd_config(_args) -> int:
     print(cfgmod.config_path())
     return 0
@@ -351,6 +362,9 @@ def main(argv=None) -> int:
     sub.add_parser("offline", help="install the offline engine, to dictate without internet").set_defaults(fn=cmd_offline)
     for action in ("paste", "copy"):
         sub.add_parser(f"{action}-last", help=f"{action} the last dictation again").set_defaults(fn=cmd_last, action=action)
+    dc = sub.add_parser("dictation", help="start, stop or toggle a recording in the running hold-dictate, as the hotkey would")
+    dc.add_argument("action", choices=["start", "stop", "toggle"])
+    dc.set_defaults(fn=cmd_dictation)
     h = sub.add_parser("history", help="list, search, delete or clear saved dictations")
     h.add_argument("action", nargs="?", default="list", choices=["list", "search", "delete", "clear"])
     h.add_argument("value", nargs="?", help="what to search for, or the id to delete")

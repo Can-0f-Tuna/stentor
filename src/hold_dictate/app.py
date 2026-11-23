@@ -117,6 +117,18 @@ class Dictation:
                 else:
                     self.latched = True
 
+    def command(self, action: str):
+        """`hold-dictate dictation start|stop|toggle`: a key bound in the desktop's own keyboard settings, for a
+        desktop where this program is not allowed to read the keyboard. The command says what it wants, so the
+        hotkey mode has no say: start begins a recording, stop ends one, toggle does whichever applies."""
+        with self.lock:
+            if self.recorder is not None:
+                if action != "start":
+                    self.finish()
+            elif action != "stop":
+                self.begin()
+                self.latched = action == "toggle" and self.recorder is not None  # the key of a toggle is up again
+
     def _downloading(self, model: str, started: bool):
         """The first load of a model downloads it, which takes minutes: say so, or the first dictation just hangs."""
         if started:

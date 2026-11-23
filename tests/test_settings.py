@@ -281,6 +281,18 @@ def test_last_dictation_without_session(server):
     assert call(server, "/api/last/paste", {}) == (200, {"message": "hold-dictate is not running"})
 
 
+def test_dictation_commands_reach_the_running_session(server):
+    from hold_dictate import cli
+    assert call(server, "/api/dictation/toggle", {}) == (200, {"message": "hold-dictate is not running"})
+    asked = []
+    server.session = type("Session", (), {"command": lambda self, action: asked.append(action)})()
+    for action in ("start", "stop", "toggle"):
+        assert cli.main(["dictation", action]) == 0
+    assert asked == ["start", "stop", "toggle"]
+    assert call(server, "/api/dictation/cancel", {})[0] == 404
+    assert call(server, "/api/dictation/toggle", {}, token="wrong")[0] == 403
+
+
 def test_last_dictation_with_session(tmp_path, monkeypatch):
     monkeypatch.setenv("HOLD_DICTATE_CONFIG_DIR", str(tmp_path))
     done = []

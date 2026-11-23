@@ -291,6 +291,28 @@ def test_post_hook_changes_or_drops_text(api):
     assert out.calls == []
 
 
+@pytest.mark.parametrize("mode", ["hold", "auto", "toggle"])
+def test_dictation_commands_start_and_stop_a_recording_whatever_the_hotkey_mode(api, mode):
+    d, out, _ = dictation(cfg_for(api, hotkey_mode=mode))
+    d.command("stop")  # nothing to stop
+    assert d.recorder is None
+    d.command("toggle")
+    first = d.recorder
+    assert first is not None and d.latched  # the key of a toggle is up again, as after a tap
+    d.command("start")  # already recording: the same one goes on
+    assert d.recorder is first
+    time.sleep(0.3)
+    d.command("toggle")
+    settle(d)
+    assert d.recorder is None and [call["text"] for call in out.calls] == ["hello world"]
+    d.command("start")
+    assert d.recorder is not None and not d.latched  # a key that sends start on its press is still held
+    time.sleep(0.3)
+    d.command("stop")
+    settle(d)
+    assert d.recorder is None and len(out.calls) == 2
+
+
 def test_paste_and_copy_last(api):
     d, out, _ = dictation(cfg_for(api, auto_submit=True), app="slack")
     assert d.paste_last() == "nothing dictated yet" and d.copy_last() == "nothing dictated yet"

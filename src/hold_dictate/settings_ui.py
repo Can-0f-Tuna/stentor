@@ -255,6 +255,12 @@ class SettingsServer:
         note = self.session.copy_last() if action == "copy" else self.session.paste_last()
         return {"message": note or ""}
 
+    def dictation(self, action: str) -> dict:
+        if not self.session:
+            return {"message": "hold-dictate is not running"}
+        self.session.command(action)
+        return {"message": ""}
+
     def history_list(self, body: dict) -> dict:
         rows = history.entries(self.cfg, str(body.get("q", "")))
         return {"entries": rows[:HISTORY_ROWS], "total": len(rows)}
@@ -363,6 +369,9 @@ class _Handler(BaseHTTPRequestHandler):
                 "/api/problem/clear": self.app.clear_problem,
                 "/api/last/copy": lambda: self.app.last("copy"),
                 "/api/last/paste": lambda: self.app.last("paste"),
+                "/api/dictation/start": lambda: self.app.dictation("start"),
+                "/api/dictation/stop": lambda: self.app.dictation("stop"),
+                "/api/dictation/toggle": lambda: self.app.dictation("toggle"),
                 "/api/history": lambda: self.app.history_list(body),
                 "/api/history/copy": lambda: self.app.history_copy(body),
                 "/api/history/delete": lambda: self.app.history_delete(body),
