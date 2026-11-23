@@ -77,6 +77,19 @@ def test_vad_keeps_a_quiet_room_silent_at_any_microphone_level():
         assert audio.speech_only(room * 10 ** (-lower / 20)) is None, lower
 
 
+def test_vad_judges_uneven_noise_the_same_at_any_microphone_level_and_never_hears_digital_silence():
+    rng = np.random.default_rng(1)
+    hiss = rng.standard_normal(audio.SAMPLE_RATE * 3).astype(np.float32)
+    bumps = 1 + 5 * (np.sin(2 * np.pi * 0.7 * np.arange(len(hiss)) / audio.SAMPLE_RATE) > 0.6)  # a fan, a keyboard
+    room = hiss * bumps * 0.002  # uneven, so the bar and not the steady-clip rule decides
+    frame = audio.SAMPLE_RATE * 30 // 1000
+    normal = audio._voiced(room, frame)
+    assert 0 < normal.sum() < len(normal)
+    for lower in (15, 30):
+        assert (audio._voiced(room * 10 ** (-lower / 20), frame) == normal).all(), lower
+    assert audio.speech_only(room * 10 ** (-70 / 20)) is None  # its loudest frames are under -80 dBFS
+
+
 def test_wav_roundtrip(tmp_path):
     p = tmp_path / "a.wav"
     p.write_bytes(audio.wav_bytes(tone(0.5)))
