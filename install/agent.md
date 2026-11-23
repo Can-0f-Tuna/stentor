@@ -8,7 +8,7 @@ Stentor is voice typing for the whole computer: hold Alt+Space, speak, let go, a
    The installer installs uv if it is missing, installs the latest release, starts Stentor now and at every login, and opens the settings page in my browser. If the stentor command is not found afterwards, open a new shell or add ~/.local/bin to PATH. Run stentor --version to confirm.
 
 2. API key. I do this part myself.
-   Tell me to open https://console.groq.com/keys, sign in, click Create API Key, paste the key into the settings page and click Check and save. Groq has a free tier. Don't ask me to paste the key into this chat, and never write it to a file, a command line or an issue. If the settings page didn't open, run: Stentor settings
+   Tell me to open https://console.groq.com/keys, sign in, click Create API Key, paste the key into the settings page and click Check and save. Groq has a free tier. Don't ask me to paste the key into this chat, and never write it to a file, a command line or an issue. If the settings page didn't open, run: stentor settings
    Wait until I say it's saved.
 
 3. Check the setup
