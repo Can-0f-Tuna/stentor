@@ -61,6 +61,10 @@ git tag v0.8.3 && git push origin v0.8.3
 
 The Release workflow runs the tests and publishes the GitHub release, not yet marked as latest. `gh release edit <tag> --latest` lets installed copies pick it up, within 10 minutes.
 
+## Coming from hold-dictate
+
+Stentor was called hold-dictate until version 0.10. A hold-dictate install does not update itself to Stentor: run the install command above once. It installs Stentor, copies your settings, history and sign-in out of the old folder (which stays where it is), takes away the old start-at-login entry, and removes the old `hold-dictate` tool. Variables you set as `HOLD_DICTATE_*` are still read.
+
 ## Speech-to-text providers
 
 | Provider | Cost | Notes |

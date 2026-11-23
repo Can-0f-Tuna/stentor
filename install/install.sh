@@ -57,6 +57,11 @@ uv tool install --force --python "${STENTOR_PYTHON:-3.13}" "$source"
 # 4. Start now and at every login, then open the settings page for the API key.
 say "Starting Stentor"
 stentor service install
+# An install from when this was called hold-dictate. `service install` has just stopped it and taken its
+# start-at-login entry away; its tool goes too, so the old command is not left behind. Its settings were copied.
+if [ -d "$(uv tool dir 2>/dev/null)/hold-dictate" ]; then
+  uv tool uninstall hold-dictate >/dev/null 2>&1 || true
+fi
 if [ -z "${STENTOR_NO_SETUP:-}" ]; then
   say "Opening the settings in your browser. Add your API key there."
   stentor settings --wait 10 || echo "Open the settings any time with: stentor settings"

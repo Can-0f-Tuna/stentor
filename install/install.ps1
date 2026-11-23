@@ -23,7 +23,7 @@ $Python = if ($env:STENTOR_PYTHON) { $env:STENTOR_PYTHON } else { "3.13" }
 
 # A running copy locks its files; stop it before reinstalling.
 Get-CimInstance Win32_Process -Filter "Name = 'pythonw.exe' OR Name = 'python.exe'" |
-    Where-Object { $_.CommandLine -like "*stentor*" } |
+    Where-Object { $_.CommandLine -like "*stentor*" -or $_.CommandLine -like "*hold_dictate*" } |  # hold_dictate: its name before 0.10
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 Write-Host "==> Installing Stentor $Tag"
@@ -32,6 +32,9 @@ if ($LASTEXITCODE -ne 0) { throw "install failed" }
 
 Write-Host "==> Starting Stentor (it also starts at every login; look for its icon next to the clock)"
 stentor service install
+# An install from when this was called hold-dictate. `service install` has just taken its start-at-login entry
+# away; its tool goes too, so the old command is not left behind. Its settings were copied.
+if (Test-Path (Join-Path (& uv tool dir) "hold-dictate")) { uv tool uninstall hold-dictate 2>$null | Out-Null }
 if (-not $env:STENTOR_NO_SETUP) {
     Write-Host "==> Opening the settings in your browser. Add your API key there."
     stentor settings --wait 10
