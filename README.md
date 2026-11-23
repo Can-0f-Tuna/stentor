@@ -56,10 +56,10 @@ Off stops saving new dictations and deletes nothing. **Clear all**, or `stentor 
 Stentor checks GitHub every 10 minutes and, while you are not dictating, installs a newer release and restarts itself. Turn this off in the settings. When an update is waiting (automatic updates off, or the install failed), the recording pill on Linux shows a small **!** tab; click it to install, or run `stentor update`. Releases are made by pushing a tag that matches `__version__` in `src/stentor/__init__.py`:
 
 ```sh
-git tag v0.8.3 && git push origin v0.8.3
+git tag v0.10.0 && git push origin v0.10.0
 ```
 
-The Release workflow runs the tests and publishes the GitHub release, not yet marked as latest. `gh release edit <tag> --latest` lets installed copies pick it up, within 10 minutes.
+The Release workflow runs the tests and publishes the GitHub release as a pre-release, which installed copies skip. `gh release edit <tag> --prerelease=false --latest=false` lets them pick it up, within 10 minutes. Never mark a Stentor release **Latest**: that label stays on hold-dictate 0.9.4, so copies installed before the rename (which can only update to a package called hold-dictate) stay where they are.
 
 ## Coming from hold-dictate
 

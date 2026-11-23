@@ -174,9 +174,18 @@ def test_core_alone_updates_from_the_latest_github_release(monkeypatch):
         def __exit__(self, *a):
             pass
     asked = []
-    monkeypatch.setattr(updater.urllib.request, "urlopen", lambda request, timeout: asked.append(request.full_url) or Reply(b'{"tag_name": "v99.0.0"}'))
+    releases = b"""[
+        {"tag_name": "v0.9.4", "draft": false, "prerelease": false},
+        {"tag_name": "v100.0.0", "draft": false, "prerelease": true},
+        {"tag_name": "v101.0.0", "draft": true, "prerelease": false},
+        {"tag_name": "v98.0.0", "draft": false, "prerelease": false},
+        {"tag_name": "v99.0.0", "draft": false, "prerelease": false}
+    ]"""
+    monkeypatch.setattr(updater.urllib.request, "urlopen", lambda request, timeout: asked.append(request.full_url) or Reply(releases))
     u = updater.Updater(Config())
-    assert u.check() == "v99.0.0" and u.available() and asked == [updater.LATEST_URL]
+    assert u.check() == "v99.0.0" and u.available() and asked == [
+        "https://api.github.com/repos/Can-0f-Tuna/stentor/releases?per_page=100"
+    ]
     assert u.source.install_args("v99.0.0") == [updater.install_spec("v99.0.0")]
     monkeypatch.setattr(updater.urllib.request, "urlopen", lambda request, timeout: Reply(b"not json"))
     assert u.check() == "" and "could not check" in u.status

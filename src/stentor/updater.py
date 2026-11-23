@@ -17,7 +17,9 @@ from . import __version__, extensions
 from .config import env
 
 REPO = "Can-0f-Tuna/stentor"
-LATEST_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
+# Keep GitHub's /releases/latest on the last pre-rename release for standalone 0.9 installs.
+RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases?per_page=100"
+FIRST_STENTOR_VERSION = (0, 10, 0)
 # The release's source as an archive, so installing needs no git. STENTOR_CORE_URL tries a build elsewhere.
 CORE_URL = env("CORE_URL") or f"https://github.com/{REPO}/archive/refs/tags/{{tag}}.tar.gz"
 # The newest Python that every library of the offline engine has wheels for on macOS (Intel and Apple), Windows
@@ -111,9 +113,17 @@ class GitHub:
     """Where updates come from unless an extension says otherwise: this repository's latest release."""
 
     def latest(self) -> str:
-        request = urllib.request.Request(LATEST_URL, headers={"User-Agent": "stentor", "Accept": "application/vnd.github+json"})
+        request = urllib.request.Request(RELEASES_URL, headers={"User-Agent": "stentor", "Accept": "application/vnd.github+json"})
         with urllib.request.urlopen(request, timeout=10) as response:
-            return json.load(response)["tag_name"]
+            tags = [
+                release["tag_name"] for release in json.load(response)
+                if not (release["draft"] or release["prerelease"])
+                and re.fullmatch(r"v\d+\.\d+\.\d+", release["tag_name"])
+                and parse_version(release["tag_name"]) >= FIRST_STENTOR_VERSION
+            ]
+        if not tags:
+            raise ValueError("no Stentor releases found")
+        return max(tags, key=parse_version)
 
     def install_args(self, tag: str, extras=None) -> list[str]:
         return [install_spec(tag, extras)]
