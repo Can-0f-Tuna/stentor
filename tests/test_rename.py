@@ -1,5 +1,6 @@
 """An install from when the app was called hold-dictate, met by the first Stentor: its settings come along, its
 variables still count, and its start-at-login entry goes so two copies never run together."""
+import re
 import sys
 import types
 from pathlib import Path
@@ -111,6 +112,7 @@ def test_linux_uninstall_removes_both_generations(home, ran):
 
 
 def test_mac_install_boots_the_old_agent_out(tmp_path, ran, monkeypatch):
+    monkeypatch.setattr(service.os, "getuid", lambda: 501, raising=False)  # the tests also run on Windows, which has none
     monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     old = service._mac_plist("io.github.hold-dictate")
@@ -144,7 +146,13 @@ def test_windows_install_swaps_the_run_value(ran, monkeypatch):
     monkeypatch.setattr(sys, "platform", "win32")
     service.install()
     assert list(values) == ["stentor"] and "-m stentor run" in values["stentor"]
-    assert ran[0][0] == "powershell" and r"-m\s+hold_dictate\s+run" in ran[0][-1] and ran[1] == ("start",)
+    assert ran[0][0] == "powershell" and ran[1] == ("start",)
+    match = re.compile(re.search(r"-match '([^']+)'", ran[0][-1]).group(1), re.IGNORECASE).search
+    # What 0.9's Run entry and its pill helper look like in the process list; not the new app, not a one-off command.
+    assert match(r'"C:\Users\a b\uv\tools\hold-dictate\Scripts\pythonw.exe" -m hold_dictate run')
+    assert match(r"C:\uv\tools\hold-dictate\Scripts\pythonw.exe -m hold_dictate.indicator")
+    assert not match(r"C:\uv\tools\stentor\Scripts\pythonw.exe -m stentor run")
+    assert not match(r"C:\uv\tools\hold-dictate\Scripts\python.exe -m hold_dictate doctor")
     service.uninstall()
     assert values == {}
 

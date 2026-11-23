@@ -82,12 +82,12 @@ def _remove(name: str, label: str) -> None:
                 winreg.DeleteValue(key, name)
         except FileNotFoundError:
             pass
-        # The background pythonw has no window title. Match the module used by the Run entry.
+        # The background pythonw has no window title. Match the module the Run entry starts, and its pill helper.
         module = name.replace("-", "_")
         _sh(
             "powershell", "-NoProfile", "-NonInteractive", "-Command",
             "Get-CimInstance Win32_Process -Filter \"Name = 'pythonw.exe' OR Name = 'python.exe'\" | "
-            f"Where-Object {{ $_.CommandLine -match '(?:^|\\s)-m\\s+{module}\\s+run(?:\\s|$)' }} | "
+            f"Where-Object {{ $_.CommandLine -match '(?:^|\\s)-m\\s+{module}(?:\\s+run|\\.indicator)(?:\\s|$)' }} | "
             "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
         )
     elif sys.platform == "darwin":

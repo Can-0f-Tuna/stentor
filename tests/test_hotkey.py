@@ -60,6 +60,7 @@ def test_evdev_backend_reads_events():
     assert actions == ["start", "stop"]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Linux keyboards; select() takes only sockets on Windows")
 def test_a_keyboard_that_disappears_leaves_the_others_working():
     """A Bluetooth headset turning off made read() raise ENODEV, and the hotkey died with it (#1)."""
     class Gone:

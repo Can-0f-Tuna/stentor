@@ -54,9 +54,9 @@ if (-not $Source) {
     $Packages += "--with", "faster-whisper>=1.0"
 }
 
-# A running copy locks its files. Match the daemon of either generation and stop it before reinstalling.
+# A running copy locks its files: stop the app and its recording-pill helper, of either name, before reinstalling.
 Get-CimInstance Win32_Process -Filter "Name = 'pythonw.exe' OR Name = 'python.exe'" |
-    Where-Object { $_.CommandLine -match '(?:^|\s)-m\s+(?:stentor|hold_dictate)\s+run(?:\s|$)' } |
+    Where-Object { $_.CommandLine -match '(?:^|\s)-m\s+(?:stentor|hold_dictate)(?:\s+run|\.indicator)(?:\s|$)' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 Write-Host "==> Installing Stentor $Tag"
