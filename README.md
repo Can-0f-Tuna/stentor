@@ -87,7 +87,7 @@ If the cloud request fails and the `local` extra is installed, it falls back to 
 | `stentor setup` | Guided setup in the terminal (safe to run again) |
 | `stentor doctor` | Checks microphone, keyboard access, paste helpers and API key. `--offline` stays on this computer, `--json` is for scripts |
 | `stentor history` | Lists saved dictations. Also `history search WORDS`, `history delete ID`, `history clear` |
-| `stentor transcribe FILE.wav` | Transcribes a file |
+| `stentor transcribe FILE` | Transcribes WAV, MP3, M4A, MP4, MOV, FLAC, OGG, WebM or AIFF. Formats other than WAV need PyAV (included in `stentor[local]`) or `ffmpeg` on `PATH` |
 | `stentor service install\|uninstall\|status` | Start at login |
 | `stentor update` | Installs the latest release now |
 | `stentor paste-last` | Pastes the last dictation again (also available as a shortcut in Settings) |

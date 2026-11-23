@@ -1,5 +1,8 @@
 """Microphone capture and the small signal helpers around it."""
 import io
+import os
+import shutil
+import subprocess
 import sys
 import threading
 import wave
@@ -185,15 +188,58 @@ def wav_bytes(audio: np.ndarray) -> bytes:
 
 
 def read_audio_file(path: str) -> np.ndarray:
-    """Reads a 16 kHz-or-other mono/stereo WAV as float32 at 16 kHz (WAV only, no extra dependencies)."""
+    """Reads a local audio or video file as mono float32 at SAMPLE_RATE."""
+    path = os.path.abspath(path)
+    try:
+        return _read_wav(path)
+    except (wave.Error, EOFError):
+        if path.lower().endswith(".wav"):
+            raise
+    try:
+        import av
+    except ImportError:
+        return _read_ffmpeg(path)
+    return _read_av(path, av)
+
+
+def _read_wav(path: str) -> np.ndarray:
     with wave.open(path, "rb") as w:
         rate, channels, width = w.getframerate(), w.getnchannels(), w.getsampwidth()
         if width != 2:
             raise ValueError("only 16-bit WAV files are supported")
-        data = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
+        data = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float32) / 32768
     if channels > 1:
         data = data.reshape(-1, channels).mean(axis=1)
     if rate != SAMPLE_RATE:
         target = int(len(data) * SAMPLE_RATE / rate)
         data = np.interp(np.linspace(0, len(data) - 1, target), np.arange(len(data)), data).astype(np.float32)
     return data
+
+
+def _read_av(path: str, av) -> np.ndarray:
+    chunks = []
+    try:
+        with av.open(path, options={"protocol_whitelist": "file,pipe"}) as source:
+            if not source.streams.audio:
+                raise ValueError("The file has no audio stream.")
+            resampler = av.AudioResampler(format="s16", layout="mono", rate=SAMPLE_RATE)
+            for frame in source.decode(audio=0):
+                chunks.extend(out.to_ndarray().ravel() for out in resampler.resample(frame))
+            chunks.extend(out.to_ndarray().ravel() for out in resampler.resample(None))
+    except av.FFmpegError as e:
+        raise ValueError(f"PyAV could not decode the audio: {e}") from e
+    return np.concatenate(chunks).astype(np.float32) / 32768 if chunks else np.empty(0, np.float32)
+
+
+def _read_ffmpeg(path: str) -> np.ndarray:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise ValueError("This audio format needs PyAV (included in stentor[local]) or ffmpeg on PATH.")
+    result = subprocess.run([
+        ffmpeg, "-nostdin", "-v", "error", "-protocol_whitelist", "file,pipe", "-i", path,
+        "-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "s16le", "pipe:1",
+    ], capture_output=True)
+    if result.returncode:
+        error = result.stderr.decode(errors="replace").strip()
+        raise ValueError(f"ffmpeg could not decode the audio: {error or f'exit {result.returncode}'}")
+    return np.frombuffer(result.stdout, dtype="<i2").astype(np.float32) / 32768
