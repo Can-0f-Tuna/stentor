@@ -7,7 +7,10 @@ from pathlib import Path
 
 from .config import config_dir
 
-LABEL = "io.github.stentor"
+NAME, LABEL = "stentor", "io.github.stentor"
+# What an install left behind while the app was called hold-dictate. `install` takes these away, so two copies never
+# both hold the hotkey, and `uninstall` takes away both generations.
+OLD_NAME, OLD_LABEL = "hold-dictate", "io.github.hold-dictate"
 
 
 def _command() -> list[str]:
@@ -19,13 +22,13 @@ def _command() -> list[str]:
     return [python, "-m", "stentor", "run"]
 
 
-def _linux_unit() -> Path:
-    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user" / "stentor.service"
+def _linux_unit(name: str = NAME) -> Path:
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user" / f"{name}.service"
 
 
-def _linux_desktop() -> Path:
+def _linux_desktop(name: str = NAME) -> Path:
     data = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
-    return data / "applications" / "stentor-settings.desktop"
+    return data / "applications" / f"{name}-settings.desktop"
 
 
 def _write_linux_desktop():
@@ -59,21 +62,48 @@ def ensure_portal_desktop_entry():
         pass
 
 
-def _mac_plist() -> Path:
-    return Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
+def _mac_plist(label: str = LABEL) -> Path:
+    return Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
 
 
 def _sh(*cmd) -> int:
-    return subprocess.run(list(cmd), capture_output=True).returncode
+    try:
+        return subprocess.run(list(cmd), capture_output=True).returncode
+    except FileNotFoundError:  # no systemctl on this system
+        return 127
+
+
+def _remove(name: str, label: str) -> None:
+    """Stops the copy that starts at login under this name and takes its entry away. Nothing happens if there is none."""
+    if sys.platform == "win32":
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE) as key:
+                winreg.DeleteValue(key, name)
+        except FileNotFoundError:
+            pass
+        _sh("taskkill", "/F", "/IM", "pythonw.exe", "/FI", f"WINDOWTITLE eq {name}*")
+    elif sys.platform == "darwin":
+        plist = _mac_plist(label)
+        _sh("launchctl", "bootout", f"gui/{os.getuid()}", str(plist))
+        plist.unlink(missing_ok=True)
+    else:
+        unit = _linux_unit(name)
+        if unit.exists():
+            _sh("systemctl", "--user", "disable", "--now", f"{name}.service")
+            unit.unlink()
+            _sh("systemctl", "--user", "daemon-reload")
+        _linux_desktop(name).unlink(missing_ok=True)
 
 
 def install() -> str:
     cmd = _command()
+    _remove(OLD_NAME, OLD_LABEL)
     if sys.platform == "win32":
         import winreg
         line = " ".join(f'"{c}"' if " " in c else c for c in cmd)
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as key:
-            winreg.SetValueEx(key, "stentor", 0, winreg.REG_SZ, line)
+            winreg.SetValueEx(key, NAME, 0, winreg.REG_SZ, line)
         flags = 0x00000008 | 0x08000000  # DETACHED_PROCESS | CREATE_NO_WINDOW
         subprocess.Popen(cmd, creationflags=flags, close_fds=True)
         return "Will start at every login, and is running now."
@@ -118,24 +148,10 @@ def install() -> str:
 
 
 def uninstall() -> str:
+    _remove(NAME, LABEL)
+    _remove(OLD_NAME, OLD_LABEL)
     if sys.platform == "win32":
-        import winreg
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE) as key:
-                winreg.DeleteValue(key, "stentor")
-        except FileNotFoundError:
-            pass
-        subprocess.run(["taskkill", "/F", "/IM", "pythonw.exe", "/FI", "WINDOWTITLE eq stentor*"], capture_output=True)
         return "Autostart removed. A running copy stops at the next logout."
-    if sys.platform == "darwin":
-        plist = _mac_plist()
-        _sh("launchctl", "bootout", f"gui/{os.getuid()}", str(plist))
-        plist.unlink(missing_ok=True)
-        return "Autostart removed and stopped."
-    _sh("systemctl", "--user", "disable", "--now", "stentor.service")
-    _linux_unit().unlink(missing_ok=True)
-    _linux_desktop().unlink(missing_ok=True)
-    _sh("systemctl", "--user", "daemon-reload")
     return "Autostart removed and stopped."
 
 

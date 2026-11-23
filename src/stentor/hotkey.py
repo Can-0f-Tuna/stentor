@@ -13,6 +13,8 @@ import sys
 import threading
 import time
 
+from .config import env
+
 MODIFIERS = ("alt", "ctrl", "shift", "super")
 PORTAL_RELEASE_SETTLE = 0.25  # the desktop may report the chord up before its physical modifiers
 ALIASES = {
@@ -463,7 +465,7 @@ def choose_backend(quick: bool = False, *, skip_portal: bool = False):
     press and release. The desktop's shortcut portal is for a Wayland session without that access, such as before
     the first log-out after the install. STENTOR_HOTKEY_BACKEND (auto, evdev, portal, pynput) picks one."""
     if sys.platform.startswith("linux"):
-        forced = os.environ.get("STENTOR_HOTKEY_BACKEND", "auto").strip().lower() or "auto"
+        forced = (env("HOTKEY_BACKEND") or "auto").strip().lower() or "auto"
         if forced not in ("auto", "portal", "evdev", "pynput"):
             return None, "Set STENTOR_HOTKEY_BACKEND to auto, portal, evdev or pynput."
         if forced in ("auto", "evdev"):

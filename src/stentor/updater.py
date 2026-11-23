@@ -14,11 +14,12 @@ import urllib.request
 from pathlib import Path
 
 from . import __version__, extensions
+from .config import env
 
 REPO = "Can-0f-Tuna/stentor"
 LATEST_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 # The release's source as an archive, so installing needs no git. STENTOR_CORE_URL tries a build elsewhere.
-CORE_URL = os.environ.get("STENTOR_CORE_URL") or f"https://github.com/{REPO}/archive/refs/tags/{{tag}}.tar.gz"
+CORE_URL = env("CORE_URL") or f"https://github.com/{REPO}/archive/refs/tags/{{tag}}.tar.gz"
 # The newest Python that every library of the offline engine has wheels for on macOS (Intel and Apple), Windows
 # and Linux: onnxruntime, which faster-whisper needs, stops at 3.13 on Intel Macs. The install scripts use it too.
 OFFLINE_PYTHON = (3, 13)

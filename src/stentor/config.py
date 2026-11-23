@@ -12,6 +12,12 @@ else:  # pragma: no cover
     import tomli as tomllib
 
 APP = "stentor"
+OLD_APP = "hold-dictate"  # the app's name until 0.10: its folder is copied once (adopt_old_folder), its variables still read
+
+
+def env(name: str) -> str:
+    """The value of STENTOR_<name>, or of HOLD_DICTATE_<name> where someone set it before the rename."""
+    return os.environ.get(f"STENTOR_{name}") or os.environ.get(f"HOLD_DICTATE_{name}") or ""
 
 HEBREW_PROMPT = "שלום, אני כותב בעברית ומשלב מילים באנגלית כמו pull request, GitHub ו-deploy."
 
@@ -135,15 +141,37 @@ HISTORY_DAYS = (0, 1, 7, 30, 90, 365)  # how long dictations are kept; 0 = Off, 
 OLD_KEYS = ("language", "sounds")  # read once by load() and then dropped; any other unknown key is kept
 
 
-def config_dir() -> Path:
-    override = os.environ.get("STENTOR_CONFIG_DIR")
-    if override:
-        return Path(override)
+def _user_folder(app: str) -> Path:
     if sys.platform == "win32":
-        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / APP
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / app
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / APP
-    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / APP
+        return Path.home() / "Library" / "Application Support" / app
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / app
+
+
+def config_dir() -> Path:
+    override = env("CONFIG_DIR")
+    return Path(override) if override else _user_folder(APP)
+
+
+def adopt_old_folder() -> bool:
+    """The first start after the rename: copies what the app kept as hold-dictate (settings, history, the sign-in)
+    into the new folder, and leaves the old one where it is. Does nothing once the new folder exists, or when the
+    folder was chosen by hand. True when it copied."""
+    new, old = _user_folder(APP), _user_folder(OLD_APP)
+    if env("CONFIG_DIR") or new.exists() or not old.is_dir():
+        return False
+    part = new.with_name(f"{APP}.copying-{os.getpid()}")  # renamed when whole, so half a copy is never taken for the folder
+    try:
+        # Not the logs, and not the note of where the old copy's settings page is listening.
+        shutil.copytree(old, part, ignore=shutil.ignore_patterns("*.log", "*.tmp", "settings-server.json"))
+        part.rename(new)
+    except OSError as e:  # another start got there first, or the disk refused: the app still runs, on fresh settings
+        shutil.rmtree(part, ignore_errors=True)
+        if not new.exists():
+            print(f"stentor: couldn't copy the settings from {old}: {e}", file=sys.stderr, flush=True)
+        return False
+    return True
 
 
 def config_path() -> Path:
@@ -202,7 +230,7 @@ class Config:
         return self.api_key if self.api_key_service in ("", self.provider) else ""
 
     def effective_key(self) -> str:
-        return self.saved_key() or os.environ.get(self.preset()["env"], "") or os.environ.get("STENTOR_API_KEY", "")
+        return self.saved_key() or os.environ.get(self.preset()["env"], "") or env("API_KEY")
 
     def effective_base_url(self) -> str:
         return (self.base_url or self.preset()["base_url"]).rstrip("/")

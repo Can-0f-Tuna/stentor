@@ -334,6 +334,7 @@ def cmd_run(_args) -> int:
 
 
 def main(argv=None) -> int:
+    cfgmod.adopt_old_folder()  # before anything reads the settings, the history or the sign-in
     p = argparse.ArgumentParser(prog="stentor", description="Hold a hotkey, speak, release: text appears at the cursor.")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="command")
