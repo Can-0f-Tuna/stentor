@@ -433,6 +433,22 @@ def test_a_finished_phrase_is_typed_whole_and_the_next_one_follows_it():
     assert typed == ["one", " two"]
 
 
+def test_a_phrase_that_gets_no_words_while_it_goes_on_is_sent_again_whole():
+    """An extension may answer a live phrase with no words, as for one with no voice in it yet. While the phrase goes
+    on, typing stays at its start, so the voice that comes later in it is heard with the rest."""
+    early = np.concatenate([QUIET, TONE])  # still going: no pause at its end
+    whole = np.concatenate([early, TONE, QUIET])
+    live, typed = typer(Clips(early, whole), iter(["", "one two"]))
+
+    def stop_after_one(text):
+        typed.append(text)
+        live.stop()
+        return ""
+    live.type_text = stop_after_one
+    live.run()
+    assert typed == ["one two"] and live.start_at == len(whole)
+
+
 def test_a_failed_live_request_leaves_the_rest_for_the_last_pass():
     clip = np.concatenate([TONE, QUIET])
     live, typed = typer(Clips(clip), iter([]))
