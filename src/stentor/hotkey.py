@@ -49,16 +49,32 @@ def parse_hotkey(text: str) -> Hotkey:
     return Hotkey(frozenset(mods), key)
 
 
+def parse_paste_last_hotkey(text: str, hotkey: Hotkey, second: Hotkey | None) -> Hotkey | None:
+    if not isinstance(text, str):
+        raise ValueError("The paste-last shortcut must be text, for example ctrl+alt+v.")
+    if not text.strip():
+        return None
+    try:
+        key = parse_hotkey(text)
+    except ValueError as e:
+        raise ValueError(f"Invalid paste-last shortcut: {e}") from e
+    for other, label in ((hotkey, "dictation"), (second, "second dictation")):
+        if str(key) == str(other):
+            raise ValueError(f"The paste-last shortcut must differ from the {label} shortcut ({other}).")
+    return key
+
+
 class HoldDetector:
     """Turns raw key events into actions. Letting go of any part of the hotkey stops.
 
     The dictation hotkey gives 'start' and 'stop'; the optional second hotkey gives 'second:start' and
-    'second:stop'. When both match the keys held (alt+space inside alt+shift+space), the one with more
-    modifiers wins. Only one is active at a time."""
+    'second:stop'. The paste-last hotkey gives 'paste-last' once per press. When shortcuts match the
+    same keys held (alt+space inside alt+shift+space), the one with more modifiers wins."""
 
-    def __init__(self, hotkey: Hotkey, second: Hotkey | None = None):
+    def __init__(self, hotkey: Hotkey, second: Hotkey | None = None, *, paste_last: Hotkey | None = None):
         self.hotkey = hotkey
         self.second = second
+        self.paste_last = paste_last
         self.down: dict[str, set] = {}  # name -> physical key ids currently held
         self.active = False
         self.which = ""  # "" for the dictation hotkey, "second" for the second hotkey, while active
@@ -68,7 +84,7 @@ class HoldDetector:
         self._portal_state = threading.Condition()
 
     def hotkeys(self) -> list:
-        return [h for h in (self.hotkey, self.second) if h is not None]
+        return [h for h in (self.hotkey, self.second, self.paste_last) if h is not None]
 
     def _stop_if(self, which: str) -> str | None:
         if self.active and self.which == which:
@@ -132,6 +148,8 @@ class HoldDetector:
                 self._portal_down.add(shortcut)
                 if self.active:
                     return None
+                if shortcut == "paste":
+                    return "paste-last"
                 self.active, self.which = True, which
                 return "second:start" if which else "start"
             if shortcut not in self._portal_down:
@@ -140,7 +158,7 @@ class HoldDetector:
             # A portal release can precede the release of the physical modifiers.
             self._settled_at = time.monotonic() + PORTAL_RELEASE_SETTLE
             self._portal_state.notify_all()
-            return self._stop_if(which)
+            return None if shortcut == "paste" else self._stop_if(which)
 
     def portal_paste_ready(self) -> bool:
         with self._portal_state:
@@ -163,16 +181,21 @@ class HoldDetector:
         return True
 
     def feed(self, name: str, ident, pressed: bool):
-        """Returns 'start', 'stop', 'second:start', 'second:stop' or None."""
+        """Returns a recording action, 'paste-last' or None."""
         ids = self.down.setdefault(name, set())
         if pressed:
+            repeated = ident in ids
             ids.add(ident)
             if self.active:
                 return None
-            matches = [(len(h.mods), which) for which, h in (("", self.hotkey), ("second", self.second))
+            shortcuts = (("", self.hotkey), ("second", self.second), ("paste-last", self.paste_last))
+            matches = [(len(h.mods), which) for which, h in shortcuts
                        if h is not None and name == h.key and all(self.is_down(m) for m in h.mods)]
             if matches:
-                self.active, self.which = True, max(matches, key=lambda m: m[0])[1]  # a tie: dictation
+                which = max(matches, key=lambda m: m[0])[1]  # a tie: dictation first
+                if which == "paste-last":
+                    return None if repeated else which
+                self.active, self.which = True, which
                 return "second:start" if self.which else "start"
         else:
             ids.discard(ident)

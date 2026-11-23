@@ -317,10 +317,10 @@ class PortalBackend:
         assigns = desktop_assigns()
 
         def requested():
-            wanted = [("dictation", "Dictate", detector.hotkey)]
-            if detector.second is not None:
-                wanted.append(("second", "Second dictation shortcut", detector.second))
-            return [(shortcut_id(name, key, assigns), name, label, key) for name, label, key in wanted]
+            wanted = [("dictation", "Dictate", detector.hotkey),
+                      ("second", "Second dictation shortcut", detector.second),
+                      ("paste", "Paste last dictation", detector.paste_last)]
+            return [(shortcut_id(name, key, assigns), name, label, key) for name, label, key in wanted if key is not None]
 
         while not stop.is_set():
             shortcuts = requested()
@@ -387,6 +387,9 @@ class PortalBackend:
             pressed = kind == "Activated"
             action = detector.feed_shortcut(name, pressed)
             if not action:
+                continue
+            if action == "paste-last":
+                emit(action)
                 continue
             toggle = mode() == "toggle"
             if pressed:

@@ -8,7 +8,7 @@ from . import audio, extensions, history, paste, textproc
 from .ducking import Ducker
 from .config import Config
 from .feedback import Feedback
-from .hotkey import HoldDetector, choose_backend, parse_hotkey
+from .hotkey import HoldDetector, choose_backend, parse_hotkey, parse_paste_last_hotkey
 from .live import LiveTyper
 from .providers import LocalTranscriber, TranscribeError, language_hints, transcribe_api
 
@@ -471,8 +471,18 @@ def run(cfg: Config) -> int:
         cfg.hotkey = Config().hotkey  # otherwise every save on the settings page would fail on it
         hotkey = parse_hotkey(cfg.hotkey)
 
+    second = extensions.second_hotkey(cfg, hotkey)
+    paste_last_problem = ""
+    try:
+        paste_last = parse_paste_last_hotkey(cfg.paste_last_hotkey, hotkey, second)
+    except ValueError as e:
+        paste_last_problem = str(e)
+        print(f"stentor: {paste_last_problem}", file=sys.stderr, flush=True)
+        cfg.paste_last_hotkey = ""
+        paste_last = None
+
     feedback = Feedback(cfg)
-    detector = HoldDetector(hotkey, extensions.second_hotkey(cfg, hotkey))
+    detector = HoldDetector(hotkey, second, paste_last=paste_last)
     dictation = Dictation(cfg, feedback)
     if isinstance(backend, PortalBackend):
         dictation.portal_detector = detector
@@ -486,21 +496,25 @@ def run(cfg: Config) -> int:
         if new_cfg.provider == "local" and dictation.local.loaded != new_cfg.local_model and not extensions.transcribes(new_cfg):
             dictation.local.preload()
         new_hotkey = parse_hotkey(new_cfg.hotkey)
+        new_second = extensions.second_hotkey(new_cfg, new_hotkey)
+        new_paste_last = parse_paste_last_hotkey(new_cfg.paste_last_hotkey, new_hotkey, new_second)
         if not portal_notice:
             server.hotkey_problem = ""  # a saved shortcut is always a valid one
         if str(new_hotkey) != str(detector.hotkey):
             stopped = detector.set_hotkey(new_hotkey)
             if dictation.portal_detector is None and (stopped or dictation.latched):
                 dictation.finish()
-        new_second = extensions.second_hotkey(new_cfg, new_hotkey)
         if str(new_second) != str(detector.second):
             stopped = detector.set_second_hotkey(new_second)
             if dictation.portal_detector is None and (stopped or (dictation.latched and dictation.second_work)):
                 dictation.finish()
+        detector.paste_last = new_paste_last
+        server.paste_last_problem = ""
 
     portal_notice = ""
     server = SettingsServer(cfg, on_saved=on_saved, updater=updater, session=dictation).start()
     server.problem, server.hotkey_problem = problem, hotkey_problem
+    server.paste_last_problem = paste_last_problem
     dictation.on_no_key = server.open
     extensions.started(dictation, server, detector)
     if cfg.provider == "local" and not extensions.transcribes(cfg):
@@ -522,6 +536,19 @@ def run(cfg: Config) -> int:
 
     lost = threading.Event()  # the keyboard listener ended by itself
 
+    def paste_again():
+        if dictation.portal_detector is not None or detector.wait_released(2.0):
+            dictation.paste_last()
+        else:
+            feedback.notify("Release the shortcut after pressing it to paste the last dictation.")
+
+    def on_action(action):
+        if action == "paste-last":
+            # Keep reading key events while we wait for the keys to come up.
+            threading.Thread(target=paste_again, daemon=True, name="paste last dictation").start()
+        else:
+            dictation.on_action(action)
+
     def listen():
         nonlocal backend, portal_notice
 
@@ -534,7 +561,7 @@ def run(cfg: Config) -> int:
         if isinstance(backend, PortalBackend):
             backend.on_problem = portal_problem
             try:
-                backend.run(detector, dictation.on_action, tick, stop=done, mode=lambda: cfg.hotkey_mode)
+                backend.run(detector, on_action, tick, stop=done, mode=lambda: cfg.hotkey_mode)
                 return
             except PortalUnavailable as e:
                 dictation.portal_detector = None
@@ -548,7 +575,7 @@ def run(cfg: Config) -> int:
         if hasattr(backend, "on_problem"):
             backend.on_problem = on_keyboard_problem
         try:
-            backend.run(detector, dictation.on_action, tick)
+            backend.run(detector, on_action, tick)
         finally:
             if not done.is_set():
                 lost.set()

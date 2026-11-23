@@ -5,7 +5,7 @@ import threading
 
 import pytest
 
-from stentor.hotkey import EV_FORMAT, EvdevBackend, HoldDetector, parse_hotkey
+from stentor.hotkey import EV_FORMAT, EvdevBackend, HoldDetector, parse_hotkey, parse_paste_last_hotkey
 
 ALT, SPACE, SHIFT = 56, 57, 42
 
@@ -121,6 +121,28 @@ def test_second_hotkey_can_change_or_turn_off_while_held():
     d.feed("e", 18, False)
     assert d.feed("e", 18, True) is None  # off
     assert [str(h) for h in d.hotkeys()] == ["alt+d"]
+
+
+def test_paste_last_uses_hotkey_syntax_and_can_be_off():
+    main = parse_hotkey("alt+space")
+    assert parse_paste_last_hotkey("", main, None) is None
+    assert str(parse_paste_last_hotkey("Control + Option + V", main, None)) == "alt+ctrl+v"
+    with pytest.raises(ValueError, match="Invalid paste-last shortcut"):
+        parse_paste_last_hotkey("v", main, None)
+
+
+def test_paste_last_fires_once_per_press_and_can_change_live():
+    d = HoldDetector(parse_hotkey("alt+v"), paste_last=parse_hotkey("ctrl+alt+v"))
+    d.feed("alt", 56, True)
+    d.feed("ctrl", 29, True)
+    assert d.feed("v", 47, True) == "paste-last"
+    assert d.feed("v", 47, True) is None  # pynput can report repeats
+    assert d.feed("v", 47, False) is None  # no recording to stop
+    assert d.feed("v", 47, True) == "paste-last"
+    d.feed("v", 47, False)
+    d.paste_last = None
+    assert d.feed("v", 47, True) == "start"
+    assert d.feed("v", 47, False) == "stop"
 
 
 def test_wait_released():

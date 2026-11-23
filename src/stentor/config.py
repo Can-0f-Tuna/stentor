@@ -192,6 +192,7 @@ class Config:
     languages: str = ""  # the languages you speak, comma-separated codes such as "he,en"; empty = any language
     prompt: str = ""  # optional spelling hint: words and names the transcriber should spell your way
     hotkey: str = "alt+space"
+    paste_last_hotkey: str = ""
     hotkey_mode: str = "hold"  # hold | auto | toggle
     silence_stop: float = 0.0  # auto and toggle: stop after this many seconds of quiet once you spoke; 0 = off
     live_text: bool = False  # type into the focused text box while you speak; uses extra requests

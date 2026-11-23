@@ -87,6 +87,7 @@ class SettingsServer:
         self.daemon = daemon
         self.problem = ""  # set when no shortcut can work (the keyboard can't be read), shown on the page
         self.hotkey_problem = ""  # set when the saved shortcut was invalid and the default is used
+        self.paste_last_problem = ""
         self.token = (daemon and saved_token()) or secrets.token_urlsafe(24)
         self.lock = threading.Lock()
         handler = type("Handler", (_Handler,), {"app": self})
@@ -135,6 +136,7 @@ class SettingsServer:
             "running": self.daemon,
             "problem": self.problem,
             "hotkey_problem": self.hotkey_problem,
+            "paste_last_problem": self.paste_last_problem,
             "last_problem": getattr(getattr(session, "fb", None), "last_problem", None),
             "config": values,
             "key_hint": f"…{key[-4:]}" if len(key) >= 8 else ("set" if key else ""),
@@ -169,7 +171,7 @@ class SettingsServer:
 
     def candidate(self, changes: dict) -> Config:
         """A copy of the current config with the changes applied and checked. Raises ValueError."""
-        from .hotkey import parse_hotkey
+        from .hotkey import parse_hotkey, parse_paste_last_hotkey
         new = Config(**asdict(self.cfg))
         own = extensions.settings_fields()
         for name, value in changes.items():
@@ -186,7 +188,9 @@ class SettingsServer:
         extensions.check_settings(new, changes)
         if new.provider not in (*PROVIDERS, "local"):
             raise ValueError("unknown provider")
-        parse_hotkey(new.hotkey)
+        hotkey = parse_hotkey(new.hotkey)
+        if new.paste_last_hotkey:
+            parse_paste_last_hotkey(new.paste_last_hotkey, hotkey, extensions.second_hotkey(new, hotkey))
         if new.overlay_position not in ("bottom", "top"):
             raise ValueError("position must be bottom or top")
         if new.background_audio not in DUCK_MODES:

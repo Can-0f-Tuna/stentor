@@ -173,6 +173,19 @@ def test_toggle_mode_needs_no_release(listener):
     assert actions == ["start", "stop", "cancel"]  # both at the press: the app latches the recording, as after a tap
 
 
+def test_paste_last_is_bound_and_does_not_toggle_recording(listener, monkeypatch):
+    monkeypatch.delenv("HYPRLAND_INSTANCE_SIGNATURE", raising=False)
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    detector = HoldDetector(parse_hotkey("f9"), paste_last=parse_hotkey("ctrl+alt+v"))
+    actions, _, _ = listener(detector, {"dictation": "F9", "paste": "Alt+Ctrl+V"}, [
+        ("Activated", "paste"), ("Activated", "paste"), ("Deactivated", "paste"),
+        ("Activated", "dictation"), ("Deactivated", "dictation"),
+        ("Activated", "paste"), ("Deactivated", "paste"),
+    ], mode="toggle")
+    assert listener.portal.asked == [["dictation-F9", "paste-ALT-CTRL-v"]]
+    assert actions == ["paste-last", "start", "stop", "paste-last", "cancel"]
+
+
 def test_a_changed_key_is_asked_for_under_a_new_id(listener, monkeypatch):
     monkeypatch.delenv("HYPRLAND_INSTANCE_SIGNATURE", raising=False)
     monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")

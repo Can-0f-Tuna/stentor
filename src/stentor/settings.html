@@ -86,6 +86,9 @@ code { font:500 .9em var(--mono); background:var(--soft); border:1px solid var(-
 .setup .slot .cmd { display:block; padding:var(--s-3) var(--s-4); font-size:var(--t-sm); border-radius:var(--r-md); user-select:all; }
 .lede { margin-top:var(--s-4); font-size:var(--t-md); color:var(--muted); max-width:56ch; }
 .hero .acts { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin-top:var(--s-5); }
+.paste-shortcut { margin-top:var(--s-5); }
+.paste-shortcut .keys { font-size:24px; gap:var(--s-2); }
+.paste-shortcut .pair { gap:var(--s-2); }
 
 /* groups: a title column and a settings column, separated by space and one hairline */
 .group { display:grid; grid-template-columns:220px 1fr; gap:var(--s-5) var(--s-7); padding:var(--s-7) 0; border-bottom:1px solid var(--line); }
@@ -252,6 +255,15 @@ details .items { margin-top:var(--s-6); }
     <div class="acts">
       <button class="btn" id="recKey">Change shortcut</button>
       <span class="note" id="hotkeyMsg"></span>
+    </div>
+    <div class="item paste-shortcut">
+      <div class="label">Paste last dictation</div>
+      <div class="keys" id="pasteKeys"></div>
+      <div class="acts-start">
+        <button class="btn" id="recPasteKey" aria-describedby="pasteKeys pasteKeyMsg">Set paste-last shortcut</button>
+        <button class="btn" id="clearPasteKey" aria-label="Turn off paste-last shortcut" disabled>Turn off</button>
+      </div>
+      <span class="note" id="pasteKeyMsg"></span>
     </div>
   </div>
   <div class="setup" id="setupView" hidden>
@@ -584,6 +596,12 @@ function render(s) {
   status(s);
   $('reopenWhere').textContent = where(s);
   if (recording !== 'hotkey') keycaps(c.hotkey.split('+'));
+  if (recording !== 'paste_last_hotkey') {
+    keycaps(c.paste_last_hotkey ? c.paste_last_hotkey.split('+') : [], '', $('pasteKeys'));
+    $('pasteKeyMsg').className = 'note bad';
+    $('pasteKeyMsg').textContent = s.paste_last_problem || '';
+  }
+  $('clearPasteKey').disabled = !c.paste_last_hotkey;
   $('heroLede').textContent = { auto: 'Tap the keys to start and tap again to stop, or hold them and let go when you\'re done. The text is typed where your cursor is.',
     toggle: 'Tap the keys, speak, and tap them again. The text is typed where your cursor is.' }[c.hotkey_mode] || 'Hold the keys and speak. Let go, and the text is typed where your cursor is.';
   if (!recording && s.hotkey_problem) { $('hotkeyMsg').className = 'note bad'; $('hotkeyMsg').textContent = s.hotkey_problem; }
@@ -766,21 +784,29 @@ document.querySelectorAll('#live_text button').forEach(b => b.onclick = () => sa
 
 // ---- shortcut recorder ----
 let recording = false; // the field being recorded, or false
-const REC = { hotkey: { keys: 'heroKeys', btn: 'recKey', msg: 'hotkeyMsg' } }; // an extension can add its own shortcut here
+const REC = { // an extension can add its own shortcut here
+  hotkey: { keys: 'heroKeys', btn: 'recKey', msg: 'hotkeyMsg' },
+  paste_last_hotkey: { keys: 'pasteKeys', btn: 'recPasteKey', msg: 'pasteKeyMsg' },
+};
+let recLabel = '';
 function stopRec(message) {
-  const r = REC[recording || 'hotkey'];
+  if (!recording) return;
+  const r = REC[recording];
   recording = false; $(r.keys).classList.remove('rec');
   $(r.msg).className = 'note'; $(r.msg).textContent = message || '';
-  $('recKey').textContent = 'Change shortcut';
+  $(r.btn).textContent = recLabel;
   render(S);
 }
 function startRec(field) {
   if (recording) { const same = recording === field; stopRec(); if (same) return; }
   const r = REC[field];
+  recLabel = $(r.btn).textContent;
   recording = field; $(r.keys).classList.add('rec'); keycaps([], 'press the new keys…', $(r.keys)); $(r.btn).textContent = 'Cancel';
   $(r.msg).className = 'note wait'; $(r.msg).textContent = 'A modifier (Alt, Ctrl, Shift, ' + (MAC ? 'Cmd' : 'Win') + ') plus a letter, digit, Space or F-key. Esc cancels.';
 }
 $('recKey').onclick = () => startRec('hotkey');
+$('recPasteKey').onclick = () => startRec('paste_last_hotkey');
+$('clearPasteKey').onclick = () => { stopRec(); $('recPasteKey').focus(); save({ paste_last_hotkey: '' }); };
 function pressKeys(e) {
   if (recording || !S) return;
   const held = { alt: e.altKey, ctrl: e.ctrlKey, shift: e.shiftKey, super: e.metaKey };
@@ -809,8 +835,7 @@ window.addEventListener('keydown', e => {
   const r = REC[recording];
   if (!key) { keycaps(mods, mods.length ? '+ …' : 'press the new keys…', $(r.keys)); return; }
   const field = recording;
-  recording = false;
-  $(r.keys).classList.remove('rec'); $('recKey').textContent = 'Change shortcut'; $(r.msg).textContent = '';
+  stopRec();
   save({ [field]: [...mods, key].join('+') });
 }, true);
 
