@@ -361,7 +361,11 @@ class Dictation:
             text = rewrite(text, app)
         self.fb.done()
         if self.cfg.post_hook.strip():
-            text = textproc.run_hook(self.cfg.post_hook, text, {"STENTOR_APP": app, "STENTOR_PROVIDER": source})
+            text = textproc.run_hook(self.cfg.post_hook, text, {
+                "STENTOR_APP": app, "STENTOR_PROVIDER": source,
+                # Existing hook commands can still refer to their pre-rename variables.
+                "HOLD_DICTATE_APP": app, "HOLD_DICTATE_PROVIDER": source,
+            })
             if not text:
                 print("stentor: the text hook asked not to paste this", flush=True)
                 return

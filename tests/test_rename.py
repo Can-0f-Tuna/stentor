@@ -12,7 +12,8 @@ from stentor import cli, config as cfgmod, service
 @pytest.fixture
 def home(tmp_path, monkeypatch):
     """A Linux user's folders with nothing chosen by hand."""
-    monkeypatch.delenv("STENTOR_CONFIG_DIR")
+    monkeypatch.delenv("STENTOR_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("HOLD_DICTATE_CONFIG_DIR", raising=False)
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
@@ -22,7 +23,7 @@ def home(tmp_path, monkeypatch):
 def old_install(home):
     old = home / "config" / "hold-dictate"
     old.mkdir(parents=True)
-    (old / "config.toml").write_text('hotkey = "ctrl+space"\n')
+    (old / "config.toml").write_text('hotkey = "ctrl+space"\nlearned_terms = "Stentor"\n')
     (old / "history.json").write_text("[]")
     (old / "account.json").write_text('{"token": "t"}')
     (old / "hold-dictate.log").write_text("old lines")
@@ -35,10 +36,17 @@ def test_the_old_folder_is_copied_once_and_left_in_place(home):
     assert cfgmod.adopt_old_folder()
     new = home / "config" / "stentor"
     assert sorted(p.name for p in new.iterdir()) == ["account.json", "config.toml", "history.json"]  # no log, no stale server note
-    assert cfgmod.load().hotkey == "ctrl+space"
+    assert cfgmod.load().hotkey == "ctrl+space" and cfgmod.load().extra["learned_terms"] == "Stentor"
     assert (old / "config.toml").exists() and (old / "hold-dictate.log").exists()
     (new / "config.toml").write_text('hotkey = "f9"\n')
     assert not cfgmod.adopt_old_folder() and cfgmod.load().hotkey == "f9"  # the new folder wins from then on
+
+
+def test_an_existing_new_folder_wins_without_merging(home):
+    old_install(home)
+    new = home / "config" / "stentor"
+    new.mkdir()
+    assert not cfgmod.adopt_old_folder() and list(new.iterdir()) == []
 
 
 def test_nothing_is_copied_without_an_old_folder_or_into_a_chosen_one(home, monkeypatch):
@@ -56,7 +64,8 @@ def test_any_command_brings_the_old_settings_along(home, capsys):
 
 
 def test_a_variable_set_under_the_old_name_still_counts(monkeypatch, tmp_path):
-    monkeypatch.delenv("STENTOR_CONFIG_DIR")
+    monkeypatch.delenv("STENTOR_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("HOLD_DICTATE_CONFIG_DIR", raising=False)
     monkeypatch.setenv("HOLD_DICTATE_CONFIG_DIR", str(tmp_path / "old"))
     monkeypatch.setenv("HOLD_DICTATE_API_KEY", "old-key")
     assert cfgmod.config_dir() == tmp_path / "old" and cfgmod.Config(provider="custom").effective_key() == "old-key"
@@ -76,11 +85,12 @@ def ran(monkeypatch):
 def test_linux_install_takes_the_old_unit_away_first(home, ran, monkeypatch):
     monkeypatch.setattr(service.shutil, "which", lambda name: "/usr/bin/" + name)
     old_unit, old_entry = service._linux_unit("hold-dictate"), service._linux_desktop("hold-dictate")
-    for file in (old_unit, old_entry):
+    portal = old_entry.with_name("io.github.hold-dictate.desktop")
+    for file in (old_unit, old_entry, portal):
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text("old")
     assert "running now" in service.install()
-    assert not old_unit.exists() and not old_entry.exists()
+    assert not old_unit.exists() and not old_entry.exists() and not portal.exists()
     assert service._linux_unit().name == "stentor.service" and "-m stentor run" in service._linux_unit().read_text()
     stopped, started = ran.index(("systemctl", "--user", "disable", "--now", "hold-dictate.service")), ran.index(("systemctl", "--user", "restart", "stentor.service"))
     assert stopped < started
@@ -108,7 +118,7 @@ def test_mac_install_boots_the_old_agent_out(tmp_path, ran, monkeypatch):
     old.write_text("old")
     assert "running now" in service.install()
     assert not old.exists() and service._mac_plist().name == "io.github.stentor.plist" and service._mac_plist().exists()
-    assert ran[0][:2] == ("launchctl", "bootout") and ran[0][-1] == str(old)
+    assert ran[0][:2] == ("launchctl", "bootout") and ran[0][-1].endswith("/io.github.hold-dictate")
     service.uninstall()
     assert not service._mac_plist().exists()
 
@@ -134,7 +144,7 @@ def test_windows_install_swaps_the_run_value(ran, monkeypatch):
     monkeypatch.setattr(sys, "platform", "win32")
     service.install()
     assert list(values) == ["stentor"] and "-m stentor run" in values["stentor"]
-    assert ("taskkill", "/F", "/IM", "pythonw.exe", "/FI", "WINDOWTITLE eq hold-dictate*") in ran
+    assert ran[0][0] == "powershell" and r"-m\s+hold_dictate\s+run" in ran[0][-1] and ran[1] == ("start",)
     service.uninstall()
     assert values == {}
 

@@ -10,7 +10,7 @@ import numpy as np
 
 from . import extensions, indicator
 from .audio import SAMPLE_RATE
-from .config import pill_available
+from .config import env, pill_available
 
 QML = Path(__file__).with_name("overlay.qml")
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
@@ -51,7 +51,7 @@ class Feedback:
         self.last_problem = None  # what went wrong last, for the settings page
         if pill_available():
             self.events = open(EVENTS_FILE, "w", buffering=1)
-            updated = os.environ.pop("STENTOR_UPDATED", "")
+            updated = env("UPDATED", consume=True)
             if not updated:
                 _stop_stale_overlays()
             self._ensure_overlay()

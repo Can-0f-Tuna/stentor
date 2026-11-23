@@ -280,8 +280,9 @@ def test_app_rules_copy_only_and_off(api):
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX shell commands")
-def test_post_hook_changes_or_drops_text(api):
-    d, out, _ = dictation(cfg_for(api, post_hook='printf "[%s] " "$STENTOR_APP"; cat'), app="kitty")
+@pytest.mark.parametrize("app_var", ["STENTOR_APP", "HOLD_DICTATE_APP"])  # keep saved pre-rename hooks working
+def test_post_hook_changes_or_drops_text(api, app_var):
+    d, out, _ = dictation(cfg_for(api, post_hook=f'printf "[%s] " "${app_var}"; cat'), app="kitty")
     tap(d, 0.3)
     settle(d)
     assert out.calls[0]["text"] == "[kitty] hello world"

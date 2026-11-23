@@ -6,7 +6,7 @@ import sys
 import urllib.request
 
 from . import extensions
-from .config import OFFLINE_COMMAND
+from .config import OFFLINE_COMMAND, env
 
 # Not Input Monitoring: the shortcut's event tap may change events (it hides Option+Space's space), and macOS
 # gives that kind of tap to Accessibility alone.
@@ -42,7 +42,7 @@ def mac_access() -> dict:
 def _app_rows():
     """The permission rows of the Stentor that is running, from its own checks, or None if it isn't running.
     In a terminal macOS answers for the terminal, which isn't what the app runs as."""
-    if os.environ.get(CHILD):
+    if env("HEALTH_CHILD"):
         return None
     try:
         from .settings_ui import runtime_file

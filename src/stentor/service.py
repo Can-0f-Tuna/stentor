@@ -82,10 +82,17 @@ def _remove(name: str, label: str) -> None:
                 winreg.DeleteValue(key, name)
         except FileNotFoundError:
             pass
-        _sh("taskkill", "/F", "/IM", "pythonw.exe", "/FI", f"WINDOWTITLE eq {name}*")
+        # The background pythonw has no window title. Match the module used by the Run entry.
+        module = name.replace("-", "_")
+        _sh(
+            "powershell", "-NoProfile", "-NonInteractive", "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name = 'pythonw.exe' OR Name = 'python.exe'\" | "
+            f"Where-Object {{ $_.CommandLine -match '(?:^|\\s)-m\\s+{module}\\s+run(?:\\s|$)' }} | "
+            "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
+        )
     elif sys.platform == "darwin":
         plist = _mac_plist(label)
-        _sh("launchctl", "bootout", f"gui/{os.getuid()}", str(plist))
+        _sh("launchctl", "bootout", f"gui/{os.getuid()}/{label}")
         plist.unlink(missing_ok=True)
     else:
         unit = _linux_unit(name)
@@ -93,7 +100,9 @@ def _remove(name: str, label: str) -> None:
             _sh("systemctl", "--user", "disable", "--now", f"{name}.service")
             unit.unlink()
             _sh("systemctl", "--user", "daemon-reload")
-        _linux_desktop(name).unlink(missing_ok=True)
+        desktop = _linux_desktop(name)
+        desktop.unlink(missing_ok=True)
+        desktop.with_name(f"{label}.desktop").unlink(missing_ok=True)  # GlobalShortcuts portal registration
 
 
 def install() -> str:
@@ -151,7 +160,7 @@ def uninstall() -> str:
     _remove(NAME, LABEL)
     _remove(OLD_NAME, OLD_LABEL)
     if sys.platform == "win32":
-        return "Autostart removed. A running copy stops at the next logout."
+        return "Autostart removed."
     return "Autostart removed and stopped."
 
 

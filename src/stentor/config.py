@@ -1,7 +1,8 @@
 """Settings: one TOML file in the per-user config directory, plus environment overrides for API keys."""
 import os
-import sys
 import shutil
+import sys
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import date, time
 from pathlib import Path
@@ -15,9 +16,10 @@ APP = "stentor"
 OLD_APP = "hold-dictate"  # the app's name until 0.10: its folder is copied once (adopt_old_folder), its variables still read
 
 
-def env(name: str) -> str:
+def env(name: str, *, consume: bool = False) -> str:
     """The value of STENTOR_<name>, or of HOLD_DICTATE_<name> where someone set it before the rename."""
-    return os.environ.get(f"STENTOR_{name}") or os.environ.get(f"HOLD_DICTATE_{name}") or ""
+    read = os.environ.pop if consume else os.environ.get
+    return read(f"STENTOR_{name}", read(f"HOLD_DICTATE_{name}", ""))
 
 HEBREW_PROMPT = "שלום, אני כותב בעברית ומשלב מילים באנגלית כמו pull request, GitHub ו-deploy."
 
@@ -161,13 +163,15 @@ def adopt_old_folder() -> bool:
     new, old = _user_folder(APP), _user_folder(OLD_APP)
     if env("CONFIG_DIR") or new.exists() or not old.is_dir():
         return False
-    part = new.with_name(f"{APP}.copying-{os.getpid()}")  # renamed when whole, so half a copy is never taken for the folder
     try:
-        # Not the logs, and not the note of where the old copy's settings page is listening.
-        shutil.copytree(old, part, ignore=shutil.ignore_patterns("*.log", "*.tmp", "settings-server.json"))
-        part.rename(new)
-    except OSError as e:  # another start got there first, or the disk refused: the app still runs, on fresh settings
-        shutil.rmtree(part, ignore_errors=True)
+        with tempfile.TemporaryDirectory(prefix=f".{APP}-migration-", dir=new.parent) as temporary:
+            part = Path(temporary) / APP
+            # Skip logs, transient writes and the old settings server's address.
+            shutil.copytree(old, part, ignore=shutil.ignore_patterns("*.log", "*.log.*", "*.tmp", "settings-server.json"))
+            if new.exists():  # another start finished the copy
+                return False
+            part.rename(new)
+    except OSError as e:
         if not new.exists():
             print(f"stentor: couldn't copy the settings from {old}: {e}", file=sys.stderr, flush=True)
         return False
