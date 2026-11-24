@@ -144,6 +144,7 @@ def test_mac_lowers_only_running_players(monkeypatch):
         out = "80" if "Spotify" in script and "get sound volume" in script else ""
         return subprocess.CompletedProcess(args, 0, out, "")
     monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(ducking, "_mac_running", lambda bundle: True)  # on a Mac it would ask the real system
     saved = ducking._mac_snapshot()
     assert saved == [("Spotify", 80)]
     ducking._mac_apply(saved, 0.2)
