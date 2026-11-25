@@ -99,3 +99,12 @@ def test_doctor_in_a_terminal_asks_the_running_app_for_its_permissions(server, m
     monkeypatch.setenv(health.CHILD, "1")  # the app's own checks look for themselves
     rows = health.checks(Config(background_audio="off", provider="local"), online=False)
     assert [r["ok"] for r in rows if r["text"].startswith("macOS ")] == [False, False]
+
+
+def test_no_key_is_asked_for_when_a_plan_transcribes(monkeypatch):
+    """Signed in to a Stentor plan, its cloud transcribes; doctor asked for a Groq key anyway."""
+    from stentor import extensions
+    cfg = Config()
+    assert any("API key" in r["text"] for r in health.checks(cfg, online=False))
+    monkeypatch.setattr(extensions, "transcribes", lambda cfg: True)
+    assert not any("API key" in r["text"] for r in health.checks(cfg, online=False))

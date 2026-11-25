@@ -122,6 +122,8 @@ def checks(cfg, online: bool = True) -> list:
             line(*row)
     if cfg.provider == "local":
         line(LocalTranscriber.available(), "local model library", f"Run this in a terminal: {OFFLINE_COMMAND}")
+    elif not cfg.effective_key() and extensions.transcribes(cfg):
+        pass  # an extension transcribes (a Stentor plan): a key of your own would only be its fallback
     elif online:
         problem = check_api(cfg)
         line(not problem, f"{cfg.preset()['label']} API key", problem or "Run `stentor settings`.")
