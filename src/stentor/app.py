@@ -37,6 +37,7 @@ TAIL_SECONDS = 0.2  # recording goes on this long after the release: people let 
 TAIL_GRACE = 0.04  # a stalled stream gets this much more; with audio.CLOSE_WAIT, a clip ends within tail + 100 ms
 PRUNE_SECONDS = 3600  # how often old history is cleared out, for days with no dictation
 JOIN_SECONDS = 90  # a dictation this soon after the last one, into the same app, carries on its sentence
+NO_SPACE_AFTER = "([{/\u201c\u2018\u00ab"  # an opening bracket or quote: \u201c \u2018 \u00ab
 NO_SPACE_BEFORE = ".,;:!?)]}%\u2026\u00bb\u201d\u2019\u05c3"  # \u2026 ellipsis, \u05c3 Hebrew sof pasuq
 
 
@@ -67,7 +68,7 @@ class Tail:
 
 class Dictation:
     def __init__(self, cfg: Config, feedback: Feedback, recorder_factory=None, paster=None, on_no_key=None, ducker=None,
-                 focus=None, copier=None):
+                 focus=None, copier=None, before=None):
         self.cfg = cfg
         self.ducker = ducker or Ducker(cfg)
         self.on_no_key = on_no_key
@@ -78,6 +79,7 @@ class Dictation:
         self.paster = paster or paste.paste_text
         self.portal_detector = None
         self.focus = focus or paste.focused_app
+        self.before = before or paste.text_before_cursor  # the text just before the cursor, or None if unknown
         self.copier = copier or paste.copy_text
         self.second_work = None  # what takes a recording made with the second hotkey; None for a dictation
         self.recorder = None
@@ -408,12 +410,18 @@ class Dictation:
         return not note and rule != "clipboard"
 
     def _spaced(self, text: str, app: str) -> str:
-        """Two dictations in a row into the same app ran together ("now.Can"): the next one gets a space before
-        it, unless the last one ended in a space or a new line, or this one starts with punctuation."""
-        last = self.follows
-        if not last or not text or not app or last[0] != app or time.monotonic() - last[1] > JOIN_SECONDS:
+        """A dictation that carries on text already there gets a space before it ("now. Can", not "now.Can").
+        Where the field shows what is before the cursor (macOS), that decides: no space at its start, after a space
+        or a new line or an opening bracket, or before punctuation. Elsewhere, and in terminals, whose cursor the
+        Accessibility API doesn't follow: a space when the last dictation went to the same app a moment ago and
+        didn't end in a space."""
+        if not text or text[0].isspace() or text[0] in NO_SPACE_BEFORE:
             return text
-        if last[2][-1:].isspace() or text[0].isspace() or text[0] in NO_SPACE_BEFORE:
+        before = None if paste.is_terminal(app) else self.before()
+        if before is not None:
+            return text if not before or before[-1].isspace() or before[-1] in NO_SPACE_AFTER else " " + text
+        last = self.follows
+        if not last or not app or last[0] != app or time.monotonic() - last[1] > JOIN_SECONDS or last[2][-1:].isspace():
             return text
         return " " + text
 

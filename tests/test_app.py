@@ -578,3 +578,25 @@ def test_after_enter_the_next_dictation_starts_clean(api):
     tap(d, 0.3)
     settle(d)
     assert [c["text"] for c in out.calls] == ["sent", "sent"]
+
+
+def test_what_is_before_the_cursor_decides_the_space(api):
+    """Where the field shows the text before the cursor, it decides, however long ago and wherever the last
+    dictation went; terminals keep the rule of the last dictation, since their cursor isn't shown."""
+    api.text = "there"
+    d, out, _ = dictation(cfg_for(api), app="TextEdit")
+    for before in ["Hello", "", "Hello ", "line\n", "(", None]:
+        d.before = lambda before=before: before
+        tap(d, 0.3)
+        settle(d)
+    assert [c["text"] for c in out.calls] == [" there", "there", "there", "there", "there", " there"]
+    api.text = ", then"  # punctuation first: never a space
+    d.before = lambda: "Hello"
+    tap(d, 0.3)
+    settle(d)
+    d.focus = lambda: "Terminal"
+    api.text = "ls"
+    d.follows = None
+    tap(d, 0.3)
+    settle(d)
+    assert [c["text"] for c in out.calls[6:]] == [", then", "ls"]

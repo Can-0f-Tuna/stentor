@@ -181,6 +181,43 @@ def focused_title() -> str:
     return ""
 
 
+def text_before_cursor() -> str | None:
+    """Up to two characters of the focused text field just before the cursor or the selection ("" at its start),
+    for the space between a dictation and what is already there. None when it can't be read: not macOS, or an app
+    that doesn't show its text to the Accessibility API, such as most terminals and Electron apps."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        return _mac_text_before_cursor()
+    except Exception:
+        return None
+
+
+def _mac_text_before_cursor() -> str | None:
+    from ApplicationServices import (AXUIElementCopyAttributeValue, AXUIElementCopyParameterizedAttributeValue,
+                                     AXUIElementCreateSystemWide, AXUIElementSetMessagingTimeout, AXValueCreate,
+                                     AXValueGetValue, kAXValueCFRangeType)
+    system = AXUIElementCreateSystemWide()
+    AXUIElementSetMessagingTimeout(system, 0.25)  # a busy app must not hold the paste up
+    err, element = AXUIElementCopyAttributeValue(system, "AXFocusedUIElement", None)
+    if err or element is None:
+        return None
+    AXUIElementSetMessagingTimeout(element, 0.25)
+    err, selected = AXUIElementCopyAttributeValue(element, "AXSelectedTextRange", None)
+    if err or selected is None:
+        return None
+    ok, span = AXValueGetValue(selected, kAXValueCFRangeType, None)
+    start = span[0] if ok else -1
+    if start < 0:
+        return None
+    if start == 0:
+        return ""
+    begin = max(0, start - 2)
+    err, text = AXUIElementCopyParameterizedAttributeValue(
+        element, "AXStringForRange", AXValueCreate(kAXValueCFRangeType, (begin, start - begin)), None)
+    return None if err or not isinstance(text, str) or not text else text
+
+
 def is_terminal(app: str) -> bool:
     app = app.lower()
     return any(t in app for t in TERMINALS)
