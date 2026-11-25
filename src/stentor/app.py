@@ -435,8 +435,11 @@ class Dictation:
             return "nothing dictated yet"
         app = self.focus()
         shift = {"shift": True, "paste": False}.get(paste.rule_for(self.cfg.app_rules, app))
-        with self.paste_lock:
-            return self.paster(self.last_text, app=app, shift=shift, submit=False)
+        with self.paste_lock:  # spaced as a dictation would be
+            note = self.paster(self._spaced(self.last_text, app), app=app, shift=shift, submit=False)
+        if not note:
+            self._followed(app, self.last_text, False)
+        return note
 
     def copy_last(self) -> str:
         if not self.last_text:

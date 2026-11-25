@@ -322,6 +322,8 @@ def test_paste_and_copy_last(api):
     assert d.last_text == "hello world" and d.last_app == "slack"
     assert d.paste_last() == "" and out.calls[-1] == {"text": "hello world", "app": "slack", "shift": None, "submit": False}
     assert d.copy_last() == "" and out.copied == ["hello world"]
+    d.before = lambda: "again:"  # spaced as a dictation is
+    assert d.paste_last() == "" and out.calls[-1]["text"] == " hello world"
 
 
 class LiveRecorder(FakeRecorder):
