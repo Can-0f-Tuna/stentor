@@ -194,7 +194,7 @@ def cmd_settings(args, anchor: str = "", alongside=None) -> int:
 def _daemon(path: str, get: bool = False) -> dict | None:
     """POSTs to (or GETs from) the running Stentor's local API. None when it is not running."""
     from .settings_ui import running_url, runtime_file
-    if not running_url():
+    if not running_url(timeout=5):  # a Stentor that has just started or updated can take seconds to answer
         return None
     info = json.loads(runtime_file().read_text(encoding="utf-8"))
     request = urllib.request.Request(
