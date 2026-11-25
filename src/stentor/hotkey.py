@@ -395,12 +395,15 @@ class PynputBackend:
                 if vk in codes:
                     (win_state.add if down else win_state.discard)(mod)
             # read each time: the settings page can change the hotkeys while running
-            if vk == 0x20 and any(h.key == "space" and h.mods <= win_state for h in detector.hotkeys()):
+            # and a shortcut's letter (paste-last's V) would reach the app too
+            name = "space" if vk == 0x20 else _key_name(vk, None, "win32")
+            if name and any(h.key == name and h.mods and h.mods <= win_state for h in detector.hotkeys()):
                 listener.suppress_event()
             return True
 
         def mac_intercept(event_type, event):
-            # Option+Space types a non-breaking space on macOS; swallow Space while dictating.
+            # Option+Space types a non-breaking space on macOS; swallow Space while dictating, and a shortcut's
+            # letter (paste-last's V), which the app in front would get too.
             try:
                 import Quartz
                 if event_type in _MAC_TAP_OFF:
@@ -408,7 +411,8 @@ class PynputBackend:
                     return event
                 code = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
                 flags = Quartz.CGEventGetFlags(event)
-                if code == 49 and any(h.key == "space" and all(flags & _MAC_FLAGS[m] for m in h.mods) for h in detector.hotkeys()):
+                name = "space" if code == 49 else _MAC_KEYS.get(code)
+                if name and any(h.key == name and h.mods and all(flags & _MAC_FLAGS[m] for m in h.mods) for h in detector.hotkeys()):
                     return None
             except Exception:
                 pass
