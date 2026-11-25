@@ -231,3 +231,15 @@ def test_macos_waits_for_accessibility_and_then_listens_without_a_restart(fake_p
             break
         threading.Event().wait(0.02)
     assert actions == ["start", "stop"]  # the listener started once it was allowed
+
+
+def test_a_letter_is_known_by_its_key_not_by_what_it_types():
+    """ctrl+alt+v: with Option held V types "√" on macOS and with Ctrl a control character, and in the Hebrew
+    layout it types "ה"; the key is still V."""
+    from stentor.hotkey import _key_name
+    for typed in ("√", "\x16", "ה"):
+        assert _key_name(9, typed, "darwin") == "v"
+        assert _key_name(0x56, typed, "win32") == "v"
+    assert _key_name(29, "º", "darwin") == "0"
+    assert _key_name(None, "V", "linux") == "v"  # X11 tells the letter itself
+    assert _key_name(None, None, "darwin") is None

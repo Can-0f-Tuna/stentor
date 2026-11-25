@@ -327,7 +327,22 @@ def _pynput_name(key) -> str | None:
     }
     if isinstance(key, keyboard.Key):
         return special.get(key.name) or (key.name if key.name.startswith("f") and key.name[1:].isdigit() else None)
-    char = getattr(key, "char", None)
+    return _key_name(getattr(key, "vk", None), getattr(key, "char", None))
+
+
+# macOS's virtual key codes of the letters and digits (kVK_ANSI_*), by place on the keyboard
+_MAC_KEYS = dict(zip([0, 11, 8, 2, 14, 3, 5, 4, 34, 38, 40, 37, 46, 45, 31, 35, 12, 15, 1, 17, 32, 9, 13, 7, 16, 6],
+                     "abcdefghijklmnopqrstuvwxyz")) | dict(zip([29, 18, 19, 20, 21, 23, 22, 26, 28, 25], "0123456789"))
+
+
+def _key_name(vk, char, platform: str = sys.platform) -> str | None:
+    """A letter or digit key by the key itself, not what it types: with Option held V types "√" on macOS, with
+    Ctrl held it types a control character, and in the Hebrew layout it types "ה", so ctrl+alt+v never matched."""
+    if isinstance(vk, int):
+        if platform == "darwin" and vk in _MAC_KEYS:
+            return _MAC_KEYS[vk]
+        if platform == "win32" and (0x41 <= vk <= 0x5A or 0x30 <= vk <= 0x39):
+            return chr(vk).lower()
     return char.lower() if char else None
 
 
