@@ -193,18 +193,29 @@ def text_before_cursor() -> str | None:
         return None
 
 
+CANNOT_COMPLETE = -25204  # kAXErrorCannotComplete
+
+
 def _mac_text_before_cursor() -> str | None:
     from ApplicationServices import (AXUIElementCopyAttributeValue, AXUIElementCopyParameterizedAttributeValue,
                                      AXUIElementCreateSystemWide, AXUIElementSetMessagingTimeout, AXValueCreate,
                                      AXValueGetValue, kAXValueCFRangeType)
+
+    def attribute(element, name):
+        err, value = AXUIElementCopyAttributeValue(element, name, None)
+        if err == CANNOT_COMPLETE:  # a web page builds its accessibility tree on the first question
+            time.sleep(0.05)
+            err, value = AXUIElementCopyAttributeValue(element, name, None)
+        return None if err else value
+
     system = AXUIElementCreateSystemWide()
     AXUIElementSetMessagingTimeout(system, 0.25)  # a busy app must not hold the paste up
-    err, element = AXUIElementCopyAttributeValue(system, "AXFocusedUIElement", None)
-    if err or element is None:
+    element = attribute(system, "AXFocusedUIElement")
+    if element is None:
         return None
     AXUIElementSetMessagingTimeout(element, 0.25)
-    err, selected = AXUIElementCopyAttributeValue(element, "AXSelectedTextRange", None)
-    if err or selected is None:
+    selected = attribute(element, "AXSelectedTextRange")
+    if selected is None:
         return None
     ok, span = AXValueGetValue(selected, kAXValueCFRangeType, None)
     start = span[0] if ok else -1
