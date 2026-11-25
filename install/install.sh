@@ -41,7 +41,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -z "$(stentor_env SKIP_SYSTEM)" ]; then
   fi
   if ! id -nG | tr ' ' '\n' | grep -qx input; then
     say "Allowing keyboard access (adds you to the 'input' group)"
-    sudo usermod -aG input "$USER" && echo "    Log out and back in once so the hotkey works."
+    sudo usermod -aG input "$(id -un)" && echo "    Log out and back in once so the hotkey works."
   fi
 fi
 
