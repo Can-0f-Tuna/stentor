@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import subprocess
@@ -133,6 +134,50 @@ def test_pulse_backend_skips_our_own_streams_and_headphones(monkeypatch):
         ["pactl", "set-sink-input-volume", "7", "38326", "19163"],
         ["pactl", "set-sink-input-volume", "7", "65536", "32768"],
     ]
+
+
+def test_a_stream_that_ended_while_lowered_leaves_its_app_at_its_old_volume(monkeypatch):
+    """PulseAudio and PipeWire keep the volume a stream last had for the next stream of its app: one that ended
+    while turned down (a notification) made that app quieter for good, and quieter again with each dictation."""
+    vol = {"front-left": {"value": 65536}, "front-right": {"value": 60000}}
+    keys = {"application.name": "Firefox", "media.role": "event"}
+    streams = [{"index": 7, "sink": 1, "volume": vol, "properties": {"application.process.id": "1", **keys}}]
+    calls, players = [], []
+
+    class Player:
+        pid = 4242
+
+        def __init__(self, args, **kw):
+            players.append(args)
+            self.stdin = io.BytesIO()
+
+        def wait(self, timeout=None):
+            return 0
+
+    def run(args, **kw):
+        calls.append(args)
+        if args[1:3] == ["-f", "json"]:
+            listed = [] if args[-1] == "sinks" else streams
+            return subprocess.CompletedProcess(args, 0, json.dumps(listed), "")
+        return subprocess.CompletedProcess(args, 0, "", "")
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "Popen", Player)
+    monkeypatch.setattr(ducking.shutil, "which", lambda name: f"/usr/bin/{name}")
+    saved = ducking._pulse_snapshot()
+    ducking._pulse_apply(saved, 0.2)
+    streams[:] = [{"index": 30, "sink": 1, "volume": {"mono": {"value": 38326}},
+                   "properties": {"application.process.id": "4242", **keys}}]  # 7 ended; the silent one is up
+
+    def gone(args, **kw):  # 7 is no more
+        if args[:3] == ["pactl", "set-sink-input-volume", "7"]:
+            calls.append(args)
+            return subprocess.CompletedProcess(args, 1, "", "No such entity")
+        return run(args, **kw)
+    monkeypatch.setattr(subprocess, "run", gone)
+    ducking._pulse_apply(saved, 1.0)
+    assert players == [["pacat", "--raw", "--format=s16le", "--rate=8000", "--channels=1",
+                        "--property=media.role=event", "--property=application.name=Firefox"]]
+    assert calls[-1] == ["pactl", "set-sink-input-volume", "30", "65536"]
 
 
 def test_mac_lowers_only_running_players(monkeypatch):

@@ -123,7 +123,7 @@ def can_detect_focus() -> bool:
         return True
     if _wayland():
         return any(shutil.which(n) for n in ("niri", "hyprctl", "swaymsg"))
-    return _has("xdotool")
+    return _has("xdotool") or bool(os.environ.get("DISPLAY"))
 
 
 def focused_app() -> str:
@@ -147,11 +147,66 @@ def focused_app() -> str:
                     if node.get("focused"):
                         return node.get("app_id") or (node.get("window_properties") or {}).get("class") or ""
                     stack += node.get("nodes", []) + node.get("floating_nodes", [])
-        elif shutil.which("xdotool"):
-            return _run(["xdotool", "getwindowfocus", "getwindowclassname"], text=True).stdout.strip()
+        else:
+            try:
+                return _x11_focused_class()
+            except Exception:  # no libX11
+                if shutil.which("xdotool"):
+                    return _run(["xdotool", "getwindowfocus", "getwindowclassname"], text=True).stdout.strip()
     except Exception:
         pass
     return ""
+
+
+def _x11_focused_class() -> str:
+    """The class (WM_CLASS) of the window with keyboard focus, through libX11. xdotool's getwindowclassname is
+    newer than the xdotool Ubuntu and Debian ship (3.20160805), where the app went unnamed: a terminal got Ctrl+V,
+    which pastes nothing there."""
+    import ctypes
+    import ctypes.util
+
+    class ClassHint(ctypes.Structure):
+        _fields_ = [("res_name", ctypes.c_void_p), ("res_class", ctypes.c_void_p)]
+    x = ctypes.CDLL(ctypes.util.find_library("X11") or "libX11.so.6")
+    ulong, ref = ctypes.c_ulong, ctypes.c_void_p
+    x.XOpenDisplay.restype = ref
+    x.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x.XCloseDisplay.argtypes = [ref]
+    x.XGetInputFocus.argtypes = [ref, ctypes.POINTER(ulong), ctypes.POINTER(ctypes.c_int)]
+    x.XGetClassHint.argtypes = [ref, ulong, ctypes.POINTER(ClassHint)]
+    x.XQueryTree.argtypes = [ref, ulong, ctypes.POINTER(ulong), ctypes.POINTER(ulong), ctypes.POINTER(ref),
+                             ctypes.POINTER(ctypes.c_uint)]
+    x.XFree.argtypes = [ref]
+    display = x.XOpenDisplay(None)
+    if not display:
+        return ""
+    try:
+        window, revert = ulong(), ctypes.c_int()
+        x.XGetInputFocus(display, ctypes.byref(window), ctypes.byref(revert))
+        current = window.value
+        for _ in range(32):  # the focus can sit on a widget inside the window that has the class
+            if current in (0, 1):  # None, PointerRoot
+                return ""
+            hint = ClassHint()
+            if x.XGetClassHint(display, current, ctypes.byref(hint)):
+                name = ctypes.string_at(hint.res_class).decode("utf-8", "replace") if hint.res_class else ""
+                for field in (hint.res_name, hint.res_class):
+                    if field:
+                        x.XFree(field)
+                if name:
+                    return name
+            root, parent, children, count = ulong(), ulong(), ref(), ctypes.c_uint()
+            if not x.XQueryTree(display, current, ctypes.byref(root), ctypes.byref(parent), ctypes.byref(children),
+                                ctypes.byref(count)):
+                return ""
+            if children.value:
+                x.XFree(children)
+            if not parent.value or parent.value == root.value:
+                return ""
+            current = parent.value
+        return ""
+    finally:
+        x.XCloseDisplay(display)
 
 
 def focused_title() -> str:

@@ -62,15 +62,51 @@ def _pulse_snapshot():
             continue
         values = [ch["value"] for ch in stream.get("volume", {}).values()]
         if values:
-            saved.append((str(stream["index"]), values))
+            props = stream.get("properties", {})
+            saved.append((str(stream["index"]), values, {k: props[k] for k in RESTORE_KEYS if props.get(k)}))
     return saved
+
+
+# What PulseAudio and PipeWire file a stream's volume under, to give the next stream of that app or role
+RESTORE_KEYS = ("media.role", "application.id", "application.name")
 
 
 def _pulse_apply(saved, gain):
     # PulseAudio and PipeWire volumes are cubic: 20% on their slider is -42 dB, not -14 dB.
     scale = gain ** (1 / 3)
-    for index, values in saved:  # a stream that has ended since then just fails quietly
-        subprocess.run(["pactl", "set-sink-input-volume", index, *[str(round(v * scale)) for v in values]], capture_output=True, timeout=3)
+    gone = []
+    for index, values, keys in saved:
+        done = subprocess.run(["pactl", "set-sink-input-volume", index, *[str(round(v * scale)) for v in values]],
+                              capture_output=True, timeout=3)
+        if done.returncode != 0 and gain >= 1.0 and keys:
+            gone.append((values, keys))
+    for values, keys in gone:
+        _pulse_put_back(values, keys)
+
+
+def _pulse_put_back(values, keys):
+    """A stream that ended while it was turned down (a notification, the end of a video) left its lowered volume
+    on file, and the next stream of its app started there, then went lower with the next dictation. A silent
+    stream of that app gets its old volume, so that is the one on file."""
+    if not shutil.which("pacat"):
+        return
+    args = ["pacat", "--raw", "--format=s16le", "--rate=8000", "--channels=1", *[f"--property={k}={v}" for k, v in keys.items()]]
+    player = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(40):
+            mine = [s for s in _pactl_json("sink-inputs")
+                    if s.get("properties", {}).get("application.process.id") == str(player.pid)]
+            if mine:
+                subprocess.run(["pactl", "set-sink-input-volume", str(mine[0]["index"]), str(max(values))],
+                               capture_output=True, timeout=3)
+                return
+            time.sleep(0.05)
+    finally:
+        player.stdin.close()
+        try:
+            player.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            player.kill()
 
 
 HEADPHONE_FORMS = {3, 5, 6}  # EndpointFormFactor: Headphones, Headset, Handset
