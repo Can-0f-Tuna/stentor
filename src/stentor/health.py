@@ -85,7 +85,7 @@ def checks(cfg, online: bool = True) -> list:
     """Rows of {ok, text, fix}; `fix` is in plain words, for failed rows. `online` False stays on this computer:
     the key isn't tried with the service, and extensions, which may call out, are left out."""
     from . import ducking
-    from .hotkey import choose_backend, parse_hotkey
+    from .hotkey import choose_backend, desktop_keeps, parse_hotkey
     from .paste import missing_tools
     from .providers import LocalTranscriber, check_api
     rows = []
@@ -94,8 +94,10 @@ def checks(cfg, online: bool = True) -> list:
         rows.append({"ok": bool(good), "text": text, "fix": "" if good else fix})
 
     try:
-        parse_hotkey(cfg.hotkey)
-        line(True, f"hotkey {cfg.hotkey}")
+        taken = desktop_keeps(parse_hotkey(cfg.hotkey))
+        line(not taken, f"hotkey {cfg.hotkey}" + (f": the desktop uses it too ({taken})" if taken else ""),
+             "Choose another shortcut at the top of the settings page, such as ctrl+alt+space: each dictation also "
+             "sets off what the desktop does with this one.")
     except ValueError as e:
         line(False, f"hotkey: {e}", "Choose a new shortcut at the top of the settings page, or fix `hotkey` in the config file.")
     backend, problem = choose_backend(quick=True)

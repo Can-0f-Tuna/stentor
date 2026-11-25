@@ -243,3 +243,24 @@ def test_a_letter_is_known_by_its_key_not_by_what_it_types():
     assert _key_name(29, "º", "darwin") == "0"
     assert _key_name(None, "V", "linux") == "v"  # X11 tells the letter itself
     assert _key_name(None, None, "darwin") is None
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="a Linux desktop's own shortcuts")
+def test_doctor_names_what_the_desktop_does_with_the_hotkey(tmp_path, monkeypatch):
+    """Alt+Space opens Xfce's window menu and KDE's KRunner; Stentor can't keep the key from them."""
+    import subprocess
+    from stentor import hotkey
+    from stentor.hotkey import desktop_keeps, parse_hotkey
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/xfconf-query" if name == "xfconf-query" else None)
+    xfce = "/xfwm4/custom/<Alt>space   popup_menu_key\n/xfwm4/custom/<Primary><Alt>Down   down_workspace_key\n"
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, xfce, ""))
+    assert desktop_keeps(parse_hotkey("alt+space")) == "Xfce's popup_menu_key"
+    assert desktop_keeps(parse_hotkey("ctrl+alt+space")) == ""
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    (tmp_path / "kglobalshortcutsrc").write_text(
+        "[krunner.desktop]\n_launch=Alt+Space\\tAlt+F2\\tSearch,Alt+Space\\tAlt+F2\\tSearch,KRunner\n")
+    assert desktop_keeps(parse_hotkey("alt+space")) == "KDE's KRunner"
+    assert desktop_keeps(parse_hotkey("ctrl+alt+space")) == ""
+    assert hotkey  # the module, for the patches above

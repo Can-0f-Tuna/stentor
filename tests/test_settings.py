@@ -75,20 +75,21 @@ def test_paste_last_shortcut_round_trip(server):
 
 def test_paste_last_shortcut_cannot_match_a_recording_shortcut(server, monkeypatch):
     monkeypatch.setattr("stentor.extensions.second_hotkey", lambda *_: parse_hotkey("alt+ctrl+v"))
-    for key, label in [("Option+Space", "dictation"), ("Control+Alt+V", "second dictation")]:
+    dictation = "Control+Option+Space" if config.DEFAULT_HOTKEY == "ctrl+alt+space" else "Option+Space"
+    for key, label in [(dictation, "dictation"), ("Control+Alt+V", "second dictation")]:
         code, body = call(server, "/api/config", {"paste_last_hotkey": key})
         assert code == 400 and f"must differ from the {label} shortcut" in body["error"]
     assert server.cfg.paste_last_hotkey == "" and not server.saved
     assert call(server, "/api/config", {"paste_last_hotkey": "ctrl+alt+x"})[0] == 200
     assert call(server, "/api/config", {"hotkey": "alt+ctrl+x"})[0] == 400
-    assert config.load().hotkey == "alt+space"
+    assert config.load().hotkey == config.DEFAULT_HOTKEY
 
 
 @pytest.mark.parametrize("bad", [{"hotkey": "space"}, {"overlay_bg": "red"}, {"provider": "x"}, {"beeps": "yes"}, {"nope": 1}, {"overlay_style": "stars"}, {"background_audio": "loud"}])
 def test_save_rejects_bad_values(server, bad):
     code, body = call(server, "/api/config", bad)
     assert code == 400 and body["error"]
-    assert server.cfg.hotkey == "alt+space"
+    assert server.cfg.hotkey == config.DEFAULT_HOTKEY
 
 
 def test_style_and_models(server, tmp_path):

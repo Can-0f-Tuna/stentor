@@ -15,7 +15,7 @@ def test_config_defaults_and_unknown_keys(tmp_path):
     p = tmp_path / "c.toml"
     p.write_text('provider = "local"\nbogus = 1\n')
     cfg = config.load(p)
-    assert cfg.provider == "local" and cfg.hotkey == "alt+space"
+    assert cfg.provider == "local" and cfg.hotkey == config.DEFAULT_HOTKEY
 
 
 def test_env_key_fallback(monkeypatch):

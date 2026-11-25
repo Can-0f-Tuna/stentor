@@ -12,6 +12,7 @@ import struct
 import sys
 import threading
 import time
+from pathlib import Path
 
 from .config import env
 
@@ -62,6 +63,53 @@ def parse_paste_last_hotkey(text: str, hotkey: Hotkey, second: Hotkey | None) ->
         if str(key) == str(other):
             raise ValueError(f"The paste-last shortcut must differ from the {label} shortcut ({other}).")
     return key
+
+
+def desktop_keeps(hotkey: Hotkey) -> str:
+    """What the Linux desktop does with this key itself, or "": GNOME, Xfce, Cinnamon and MATE open the window menu
+    on Alt+Space and KDE opens KRunner, and Stentor can't keep the key from them as it does on Windows and macOS."""
+    if not sys.platform.startswith("linux"):
+        return ""
+    import re
+    import shutil
+    import subprocess
+    wanted = (frozenset(hotkey.mods), hotkey.key)
+    names = {"control": "ctrl", "primary": "ctrl", "ctrl": "ctrl", "alt": "alt", "shift": "shift", "super": "super",
+             "meta": "super", "mod4": "super"}
+
+    def same(mods, key) -> bool:
+        return (frozenset(names.get(m.lower(), m.lower()) for m in mods), key.lower()) == wanted
+    try:
+        from .portal_hotkey import gnome_bindings, kept_by_gnome
+        listed = gnome_bindings()
+        if listed and (taken := kept_by_gnome(hotkey, listed)):
+            return f"GNOME's {taken}"
+    except Exception:
+        pass
+    if shutil.which("xfconf-query"):  # Xfce: "/xfwm4/custom/<Alt>space   popup_menu_key"
+        try:
+            out = subprocess.run(["xfconf-query", "-c", "xfce4-keyboard-shortcuts", "-l", "-v"], capture_output=True,
+                                 text=True, timeout=3).stdout
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        for line in out.splitlines():
+            parts = line.split(None, 1)
+            if len(parts) == 2 and "/custom/" in parts[0] and parts[1].strip() not in ("", "empty"):
+                accel = parts[0].rsplit("/", 1)[-1]
+                if same(re.findall(r"<([^>]+)>", accel), re.sub(r"<[^>]+>", "", accel)):
+                    return f"Xfce's {parts[1].strip()}"
+    kde = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "kglobalshortcutsrc"
+    try:  # KDE: "_launch=Alt+Space\\tAlt+F2\\tSearch,Alt+Space\\tAlt+F2\\tSearch,KRunner"
+        for line in kde.read_text(encoding="utf-8", errors="replace").splitlines():
+            name, _, value = line.partition("=")
+            fields = value.split(",")
+            for accel in fields[0].split("\\t") if fields else []:
+                *mods, key = accel.split("+") if accel and accel != "none" else ["", ""]
+                if key and same(mods, key):
+                    return f"KDE's {fields[-1] or name}"
+    except OSError:
+        pass
+    return ""
 
 
 class HoldDetector:

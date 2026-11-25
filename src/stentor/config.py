@@ -182,6 +182,11 @@ def config_path() -> Path:
     return config_dir() / "config.toml"
 
 
+# Linux desktops keep Alt+Space for themselves (the window menu on GNOME, Xfce, Cinnamon and MATE, KRunner on KDE),
+# and Stentor can't hide a key from them there as it does on Windows and macOS: each dictation opened a menu.
+DEFAULT_HOTKEY = "ctrl+alt+space" if sys.platform.startswith("linux") else "alt+space"
+
+
 @dataclass
 class Config:
     provider: str = "groq"  # groq | openai | custom | local
@@ -191,7 +196,7 @@ class Config:
     model: str = ""  # empty = Automatic: the provider's recommended model
     languages: str = ""  # the languages you speak, comma-separated codes such as "he,en"; empty = any language
     prompt: str = ""  # optional spelling hint: words and names the transcriber should spell your way
-    hotkey: str = "alt+space"
+    hotkey: str = DEFAULT_HOTKEY
     paste_last_hotkey: str = ""
     hotkey_mode: str = "hold"  # hold | auto | toggle
     silence_stop: float = 0.0  # auto and toggle: stop after this many seconds of quiet once you spoke; 0 = off

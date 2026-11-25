@@ -66,22 +66,29 @@ print(versions[max(versions)] if versions and max(versions) >= (0, 10, 0) else "
 fi
 
 tools="$(uv tool dir)"
-extras=""
-[ -n "$(stentor_env OFFLINE)" ] && extras="[local]"
+offline=""
+[ -n "$(stentor_env OFFLINE)" ] && offline=1
 # Running it again keeps the offline engine if this computer has it (STENTOR_OFFLINE=1 adds it).
 # An install from when this was called hold-dictate counts too: its offline engine comes along.
 old_tool="$tools/hold-dictate"
 for installed_python in "$tools/stentor/bin/python" "$old_tool/bin/python"; do
   if [ -x "$installed_python" ] && "$installed_python" -c 'from importlib.util import find_spec; raise SystemExit(find_spec("faster_whisper") is None)'; then
-    extras="[local]"
+    offline=1
   fi
 done
+# An X11 session reads the hotkey through X itself, so it works now and not only after the log-out the
+# input group needs.
+x11=""
+if [ "$(uname -s)" = "Linux" ] && [ -n "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then x11=1; fi
+extras="${offline:+local}${offline:+${x11:+,}}${x11:+x11}"
+extras="${extras:+[$extras]}"
 
 set --
 if [ -z "$source" ]; then
   source="stentor$extras @ https://github.com/$REPO/archive/refs/$ref.tar.gz"
-elif [ -n "$extras" ]; then
-  set -- "$@" --with 'faster-whisper>=1.0'
+else
+  if [ -n "$offline" ]; then set -- "$@" --with 'faster-whisper>=1.0'; fi
+  if [ -n "$x11" ]; then set -- "$@" --with 'pynput>=1.7.7'; fi
 fi
 say "Installing Stentor $tag"
 uv tool install --force --python "$python" "$@" "$source"

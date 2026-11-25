@@ -52,7 +52,7 @@ def drive(cfg, hold_seconds):
     elsewhere events are fed straight to the detector, which is what the pynput backend does."""
     pasted, fb = [], FakeFeedback()
     d = Dictation(cfg, fb, recorder_factory=FakeRecorder, paster=lambda t, **kw: pasted.append(t) or "", focus=lambda: "")
-    detector = HoldDetector(parse_hotkey(cfg.hotkey))
+    detector = HoldDetector(parse_hotkey("alt+space"))  # the keys pressed below
     if sys.platform.startswith("linux"):
         r, w = os.pipe()
         backend = EvdevBackend([os.fdopen(r, "rb", buffering=0)])
