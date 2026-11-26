@@ -10,7 +10,7 @@ import uuid
 
 from . import extensions
 from .audio import SAMPLE_RATE, Problem, wav_bytes
-from .config import HEBREW_PROMPT, LANGUAGE_NAMES, LANGUAGES, OFFLINE_COMMAND, Config
+from .config import HEBREW_PROMPT, LANGUAGE_NAMES, LANGUAGES, OFFLINE_COMMAND, OLD_GROQ, Config
 
 SAMPLES = {code: sentence for code, _, sentence in LANGUAGES if sentence}
 
@@ -33,13 +33,13 @@ def multipart(fields: dict, filename: str, content: bytes, content_type: str):
 
 
 def _brief_http_error(cfg: Config, code: int) -> str:
-    label = cfg.preset()["label"]
+    label = cfg.service_name()
     return {
         401: "The API key was rejected. Enter it again in the settings.",
         403: "This API key isn't allowed to use speech-to-text.",
         404: "The speech service doesn't know this model. Check the settings.",
         429: f"Too many requests to {label}. Wait a minute and try again.",
-    }.get(code, f"{label} had a problem (error {code}). Try again.")
+    }.get(code, f"{cfg.service_name(start=True)} had a problem (error {code}). Try again.")
 
 
 def _explain_http_error(cfg: Config, e: urllib.error.HTTPError) -> str:
@@ -53,7 +53,7 @@ def _explain_http_error(cfg: Config, e: urllib.error.HTTPError) -> str:
         404: "endpoint or model not found. Check base_url and model in your config.",
         429: "rate limit or quota reached. Wait a bit, or switch provider.",
     }
-    return f"{cfg.preset()['label']} returned {e.code}: {hints.get(e.code, detail)} ({detail})"
+    return f"{cfg.service_name(start=True)} returned {e.code}: {hints.get(e.code, detail)} ({detail})"
 
 
 def language_hints(cfg: Config) -> tuple[str, str]:
@@ -98,7 +98,10 @@ def checked(cfg: Config, ask) -> str:
 
 def transcribe_api(cfg: Config, audio) -> str:
     force, prompt = language_hints(cfg)
-    verify = len(cfg.language_codes()) > 1 and cfg.provider in ("groq", "openai") and "whisper" in cfg.effective_model()
+    # Whisper models report the language they heard (verbose_json); others, such as gpt-4o-transcribe, don't.
+    # Only where verbose_json is known to work: OpenAI and Groq's address (a custom server may reject it).
+    known = cfg.provider == "openai" or cfg.effective_base_url() == OLD_GROQ["base_url"]
+    verify = len(cfg.language_codes()) > 1 and known and "whisper" in cfg.effective_model().lower()
     if not verify:
         return _request(cfg, audio, force, prompt, "json")[0]
     return checked(cfg, lambda language: _request(cfg, audio, language, prompt, "verbose_json"))
@@ -130,7 +133,7 @@ def _request(cfg: Config, audio, language: str, prompt: str, response_format: st
     except urllib.error.HTTPError as e:
         raise TranscribeError(_explain_http_error(cfg, e), _brief_http_error(cfg, e.code)) from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise TranscribeError(f"could not reach {base}: {e}", f"Can't reach {cfg.preset()['label']}. Check your internet connection.", "net") from e
+        raise TranscribeError(f"could not reach {base}: {e}", f"Can't reach {cfg.service_name()}. Check your internet connection.", "net") from e
 
 
 def check_api(cfg: Config) -> str:
@@ -234,7 +237,7 @@ class LocalTranscriber:
             except ImportError as e:
                 raise TranscribeError(
                     f"local transcription is not installed. Install it with: {OFFLINE_COMMAND}",
-                    "Local transcription isn't installed. Pick another service in the settings.",
+                    "The offline model isn't installed yet. Install it in the settings.",
                 ) from e
             name = self.cfg.local_model
             fetch = bool(self.on_download) and not model_cached(name)

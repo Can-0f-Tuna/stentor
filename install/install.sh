@@ -102,6 +102,6 @@ if [ -d "$old_tool" ]; then
   uv tool uninstall hold-dictate >/dev/null 2>&1 || true
 fi
 if [ -z "$(stentor_env NO_SETUP)" ]; then
-  say "Opening the settings in your browser. Add your API key there."
+  say "Opening the settings in your browser. Pick where your speech is turned into text."
   stentor settings --wait 10 || echo "Open the settings any time with: stentor settings"
 fi

@@ -1,3 +1,4 @@
+import io
 import numpy as np
 import pytest
 
@@ -19,9 +20,15 @@ def test_config_defaults_and_unknown_keys(tmp_path):
 
 
 def test_env_key_fallback(monkeypatch):
-    monkeypatch.setenv("GROQ_API_KEY", "from-env")
-    assert config.Config(provider="groq").effective_key() == "from-env"
-    assert config.Config(provider="groq", api_key="file").effective_key() == "file"
+    monkeypatch.setenv("OPENAI_API_KEY", "from-env")
+    assert config.Config(provider="openai").effective_key() == "from-env"
+    assert config.Config(provider="openai", api_key="file").effective_key() == "file"
+
+
+def test_a_new_install_starts_on_this_computer(tmp_path):
+    assert config.Config().provider == "local"
+    assert config.load(tmp_path / "none.toml").provider == "local"
+    assert "groq" not in config.PROVIDERS
 
 
 def tone(seconds, freq=220, amp=0.3):
@@ -120,7 +127,7 @@ def test_api_errors_are_explained(api, status, word):
 
 def test_missing_key_and_unreachable():
     with pytest.raises(TranscribeError, match="API key"):
-        transcribe_api(config.Config(provider="groq"), tone(0.5))
+        transcribe_api(config.Config(provider="openai"), tone(0.5))
     dead = config.Config(provider="custom", base_url="http://127.0.0.1:9/v1", api_key="k", timeout=2)
     with pytest.raises(TranscribeError, match="could not reach"):
         transcribe_api(dead, tone(0.5))
@@ -149,7 +156,7 @@ def test_language_outside_the_list_is_transcribed_again(api, monkeypatch):
     answers = iter([("مرحبا", "arabic", -0.3), ("שלום", "", None)])
     sent = []
     monkeypatch.setattr(providers, "_request", lambda cfg, audio, lang, prompt, fmt: sent.append((lang, fmt)) or next(answers))
-    cfg = config.Config(provider="groq", api_key="k", languages="he,en")
+    cfg = config.Config(provider="openai", model="whisper-1", api_key="k", languages="he,en")
     assert transcribe_api(cfg, tone(0.5)) == "שלום"
     assert sent == [("", "verbose_json"), ("he", "verbose_json")]
 
@@ -169,7 +176,7 @@ def test_a_language_on_the_list_is_left_alone(monkeypatch):
     from stentor import providers
     sent = []
     monkeypatch.setattr(providers, "_request", lambda cfg, audio, lang, prompt, fmt: sent.append(lang) or ("Run it.", "english", -0.8))
-    assert transcribe_api(config.Config(provider="groq", api_key="k", languages="he,en"), tone(0.5)) == "Run it."
+    assert transcribe_api(config.Config(provider="openai", model="whisper-1", api_key="k", languages="he,en"), tone(0.5)) == "Run it."
     assert sent == [""]
 
 
@@ -270,3 +277,134 @@ def test_a_model_that_must_be_downloaded_first_says_so(monkeypatch):
     local.model, cached["small"] = None, True
     local.load()
     assert len(told) == 2  # on disk now: nothing to say
+
+
+def test_the_language_check_runs_where_verbose_json_is_known_to_work(monkeypatch):
+    """Whisper on OpenAI or Groq's address reports the language it heard; gpt-4o-transcribe doesn't, and another
+    server may not take verbose_json, so it gets the plain request it always got."""
+    from stentor import providers
+    formats = []
+    monkeypatch.setattr(providers, "_request", lambda cfg, audio, lang, prompt, fmt: formats.append(fmt) or ("Run it.", "english", -0.1))
+    for cfg in (config.Config(provider="custom", base_url="https://api.groq.com/openai/v1", api_key="k", languages="he,en"),
+                config.Config(provider="openai", model="whisper-1", api_key="k", languages="he,en"),
+                config.Config(provider="openai", api_key="k", languages="he,en"),
+                config.Config(provider="custom", base_url="http://h/v1", model="Systran/faster-whisper-large-v3", api_key="k", languages="he,en")):
+        transcribe_api(cfg, tone(0.5))
+    assert formats == ["verbose_json", "verbose_json", "json", "json"]
+
+
+# ---- configs from when Groq was a preset (and the default) ----
+
+GROQ = "https://api.groq.com/openai/v1"
+
+
+def sent_request(monkeypatch, cfg) -> tuple[str, str, bytes]:
+    """(URL, Authorization, body) of the transcription request `cfg` makes, caught before it leaves."""
+    from stentor import providers
+    caught = []
+
+    class Reply(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def urlopen(request, timeout):
+        caught.append((request.full_url, request.get_header("Authorization"), request.data))
+        return Reply(b'{"text": "hello"}')
+    monkeypatch.setattr(providers.urllib.request, "urlopen", urlopen)
+    assert transcribe_api(cfg, tone(0.5)) == "hello"
+    return caught[-1]
+
+
+def test_an_old_groq_config_transcribes_as_before_and_keeps_its_key_after_a_save(tmp_path, monkeypatch):
+    from stentor.settings_ui import SettingsServer
+    monkeypatch.setenv("STENTOR_CONFIG_DIR", str(tmp_path))
+    path = tmp_path / "config.toml"
+    path.write_text('provider = "groq"\napi_key = "gsk_old1234"\napi_key_service = "groq"\nmodel = ""\nlanguages = "en"\n')
+    cfg = config.load()
+    assert (cfg.provider, cfg.base_url, cfg.model, cfg.api_key_service) == ("custom", GROQ, "whisper-large-v3", "custom")
+    url, auth, body = sent_request(monkeypatch, cfg)
+    assert url == GROQ + "/audio/transcriptions" and auth == "Bearer gsk_old1234"
+    assert b'name="model"\r\n\r\nwhisper-large-v3\r\n' in body
+    server = SettingsServer(cfg, port=0)
+    server.save({"hotkey": "ctrl+alt+d"})  # any later save from the settings page
+    again = config.load()
+    url_again, auth_again, body_again = sent_request(monkeypatch, again)
+    assert (url_again, auth_again) == (url, auth) and b'name="model"\r\n\r\nwhisper-large-v3\r\n' in body_again
+    assert (again.provider, again.base_url, again.model, again.api_key, again.effective_key()) == ("custom", GROQ, "whisper-large-v3", "gsk_old1234", "gsk_old1234")
+    assert 'provider = "custom"' in path.read_text() and "groq\"" not in path.read_text().replace("api.groq.com", "")
+
+
+def test_a_groq_model_picked_by_hand_is_kept(tmp_path, monkeypatch):
+    p = tmp_path / "c.toml"
+    p.write_text('provider = "groq"\napi_key = "k"\nmodel = "whisper-large-v3-turbo"\n')
+    cfg = config.load(p)
+    assert (cfg.effective_base_url(), cfg.effective_model(), cfg.effective_key()) == (GROQ, "whisper-large-v3-turbo", "k")
+
+
+def test_groq_api_key_still_works_for_a_migrated_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_env5678")
+    p = tmp_path / "c.toml"
+    p.write_text('provider = "groq"\n')
+    cfg = config.load(p)
+    assert sent_request(monkeypatch, cfg)[:2] == (GROQ + "/audio/transcriptions", "Bearer gsk_env5678")
+    config.save(cfg, p)
+    assert config.load(p).effective_key() == "gsk_env5678"  # also once saved as a custom server
+    assert config.Config(provider="custom", base_url="https://other.example/v1").effective_key() == ""  # only for Groq's address
+
+
+def test_a_file_without_a_provider_and_with_a_key_stays_on_groq(tmp_path, monkeypatch):
+    """Before, the default provider was Groq, so a key in a file with no provider was a Groq key."""
+    p = tmp_path / "c.toml"
+    p.write_text('api_key = "gsk_nameless"\n')
+    cfg = config.load(p)
+    assert (cfg.provider, cfg.effective_base_url(), cfg.effective_model(), cfg.effective_key()) == ("custom", GROQ, "whisper-large-v3", "gsk_nameless")
+    p.write_text('hotkey = "ctrl+alt+d"\n')
+    assert config.load(p).provider == "local"  # nothing to keep using: the new default
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_env")
+    assert config.load(p).effective_key() == "gsk_env"  # the key in the environment counts too
+
+
+def test_a_groq_key_saved_while_elsewhere_is_found_on_the_way_back(tmp_path):
+    """Saved for Groq, then This computer picked: going back to Your own key finds Groq and the key again."""
+    from stentor.settings_ui import SettingsServer
+    p = tmp_path / "c.toml"
+    p.write_text('provider = "local"\napi_key = "gsk_kept"\napi_key_service = "groq"\n')
+    cfg = config.load(p)
+    assert cfg.provider == "local" and cfg.api_key_service == "custom"
+    server = SettingsServer(cfg, port=0)
+    assert server.state()["key_service"] == "custom"
+    server.save({"provider": "custom"})
+    assert (server.cfg.effective_base_url(), server.cfg.effective_model(), server.cfg.effective_key()) == (GROQ, "whisper-large-v3", "gsk_kept")
+
+
+def test_a_groq_key_is_never_sent_to_another_custom_server(tmp_path):
+    p = tmp_path / "c.toml"
+    p.write_text('provider = "custom"\nbase_url = "https://mine.example/v1"\napi_key = "gsk_x"\napi_key_service = "groq"\n')
+    assert config.load(p).effective_key() == ""
+
+
+def test_a_key_only_in_the_environment_keeps_the_old_default(tmp_path, monkeypatch):
+    """Before, no config file and a key in the environment meant Groq with that key: it still does."""
+    for name in ("GROQ_API_KEY", "STENTOR_API_KEY"):
+        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        monkeypatch.delenv("STENTOR_API_KEY", raising=False)
+        monkeypatch.setenv(name, "gsk_env")
+        cfg = config.load(tmp_path / "none.toml")
+        assert (cfg.provider, cfg.effective_base_url(), cfg.effective_key()) == ("custom", GROQ, "gsk_env")
+    monkeypatch.delenv("STENTOR_API_KEY")
+    assert config.load(tmp_path / "none.toml").provider == "local"
+
+
+def test_setup_still_takes_the_old_groq_choice(tmp_path, monkeypatch):
+    """Scripts that ran `stentor setup --provider groq` get Groq's address as another server."""
+    from stentor import cli, providers
+    path = tmp_path / "config.toml"
+    monkeypatch.setattr(config, "config_path", lambda: path)
+    monkeypatch.setattr(cli, "ask", lambda question, default="": default)
+    monkeypatch.setattr(providers, "check_api", lambda cfg: "")
+    assert cli.main(["setup", "--provider", "groq", "--api-key", "gsk_k", "--languages", "he,en", "--no-service"]) == 0
+    cfg = config.load(path)
+    assert (cfg.provider, cfg.effective_base_url(), cfg.effective_model(), cfg.effective_key()) == ("custom", GROQ, "whisper-large-v3", "gsk_k")

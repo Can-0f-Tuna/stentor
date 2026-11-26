@@ -72,6 +72,6 @@ try {  # with "Stop", Windows PowerShell turns a native command's error output i
     if (Test-Path $OldTool) { uv tool uninstall hold-dictate *> $null }
 } catch { }
 if (-not (Get-StentorEnv "NO_SETUP")) {
-    Write-Host "==> Opening the settings in your browser. Add your API key there."
+    Write-Host "==> Opening the settings in your browser. Pick where your speech is turned into text."
     stentor settings --wait 10
 }

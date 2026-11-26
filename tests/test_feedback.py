@@ -31,9 +31,9 @@ def pill():
 def test_a_problem_marks_the_pill_and_keeps_the_explanation_for_the_settings(monkeypatch):
     fb, notified = pill(), []
     monkeypatch.setattr(fb, "notify", notified.append)
-    fb.error("Groq returned 401: long detail", "The API key was rejected.")
+    fb.error("OpenAI returned 401: long detail", "The API key was rejected.")
     assert fb.events.lines == ["E alert"]
-    assert fb.last_problem == {"brief": "The API key was rejected.", "detail": "Groq returned 401: long detail"}
+    assert fb.last_problem == {"brief": "The API key was rejected.", "detail": "OpenAI returned 401: long detail"}
     fb.error("no microphone", icon="mic")
     assert fb.events.lines[-1] == "E mic"
     assert fb.last_problem == {"brief": "No microphone", "detail": ""}

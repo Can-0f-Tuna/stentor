@@ -15,7 +15,7 @@ from stentor.settings_ui import SettingsServer
 def server(tmp_path, monkeypatch):
     monkeypatch.setenv("STENTOR_CONFIG_DIR", str(tmp_path))
     saved = []
-    s = SettingsServer(Config(api_key="gsk_secret1234"), on_saved=saved.append, port=0).start()
+    s = SettingsServer(Config(provider="openai", api_key="sk-secret1234"), on_saved=saved.append, port=0).start()
     s.saved = saved
     yield s
     s.stop()
@@ -51,14 +51,14 @@ def test_api_rejects_bad_token_and_foreign_host(server):
 def test_state_hides_the_key(server):
     code, state = call(server, "/api/state")
     assert code == 200
-    assert "gsk_secret1234" not in json.dumps(state)
+    assert "sk-secret1234" not in json.dumps(state)
     assert state["key_hint"] == "…1234" and state["running"] is True
 
 
 def test_save_applies_and_persists(server, tmp_path):
     code, state = call(server, "/api/config", {"hotkey": "ctrl+alt+d", "beeps": False, "overlay_bg": "#112233", "api_key": ""})
     assert code == 200 and state["config"]["hotkey"] == "ctrl+alt+d"
-    assert server.cfg.api_key == "gsk_secret1234"  # empty key field keeps the saved key
+    assert server.cfg.api_key == "sk-secret1234"  # empty key field keeps the saved key
     assert server.saved and server.saved[-1].beeps is False
     on_disk = config.load(tmp_path / "config.toml")
     assert on_disk.hotkey == "ctrl+alt+d" and on_disk.overlay_bg == "#112233"
@@ -95,11 +95,12 @@ def test_save_rejects_bad_values(server, bad):
 def test_style_and_models(server, tmp_path):
     _, state = call(server, "/api/state")
     assert state["config"]["overlay_style"] == "dots" and state["config"]["model"] == ""
-    assert state["providers"]["groq"]["models"][0][0] == state["providers"]["groq"]["model"]
+    assert state["providers"]["openai"]["models"][0][0] == state["providers"]["openai"]["model"]
+    assert set(state["providers"]) == {"openai", "custom"}  # own key: OpenAI, or another OpenAI-compatible server
     assert state["local_models"][0][0] == Config().local_model  # Automatic for local = the first one
-    call(server, "/api/config", {"overlay_style": "lines", "model": "whisper-large-v3-turbo", "local_model": ""})
+    call(server, "/api/config", {"overlay_style": "lines", "model": "gpt-4o-mini-transcribe", "local_model": ""})
     on_disk = config.load(tmp_path / "config.toml")
-    assert on_disk.overlay_style == "lines" and on_disk.effective_model() == "whisper-large-v3-turbo"
+    assert on_disk.overlay_style == "lines" and on_disk.effective_model() == "gpt-4o-mini-transcribe"
     assert on_disk.local_model == "small"
 
 
@@ -224,20 +225,33 @@ def test_updater_skips_dev_checkouts():
 
 
 def test_a_key_belongs_to_its_service(server):
-    call(server, "/api/config", {"api_key": "gsk_newkey12345"})
-    assert server.cfg.api_key_service == "groq"
+    call(server, "/api/config", {"provider": "custom", "base_url": "http://127.0.0.1:9/v1", "api_key": "own-server-key12345"})
+    assert server.cfg.api_key_service == "custom"
     _, state = call(server, "/api/config", {"provider": "openai"})
-    assert state["key_hint"] == "" and server.cfg.effective_key() == ""  # a Groq key does not work with OpenAI
-    _, state = call(server, "/api/config", {"provider": "groq"})
+    assert state["key_hint"] == "" and server.cfg.effective_key() == ""  # another server's key does not work with OpenAI
+    _, state = call(server, "/api/config", {"provider": "custom"})
     assert state["key_hint"] == "…2345"
 
 
 def test_the_page_knows_which_service_the_saved_key_is_for(server):
     """Back from This computer to Your own key, the page returns to the service whose key is saved."""
-    _, state = call(server, "/api/config", {"api_key": "gsk_newkey12345"})
-    assert state["key_service"] == "groq"
+    _, state = call(server, "/api/config", {"provider": "custom", "base_url": "http://127.0.0.1:9/v1", "api_key": "own-server-key12345"})
+    assert state["key_service"] == "custom"
     _, state = call(server, "/api/config", {"provider": "local"})
-    assert state["key_service"] == "groq" and state["config"]["provider"] == "local"
+    assert state["key_service"] == "custom" and state["config"]["provider"] == "local"
+
+
+def test_a_custom_server_comes_back_after_another_service(server):
+    """Its address must not carry over to OpenAI, and must not be lost on the way back."""
+    call(server, "/api/config", {"provider": "custom", "base_url": "http://127.0.0.1:9/v1", "model": "my-whisper"})
+    call(server, "/api/config", {"provider": "openai", "model": ""})
+    assert server.cfg.effective_base_url() == "https://api.openai.com/v1" and server.cfg.effective_model() == "gpt-4o-transcribe"
+    call(server, "/api/config", {"provider": "custom"})
+    call(server, "/api/config", {"provider": "local"})
+    assert server.cfg.model == ""  # Your own key from here lands on OpenAI, which doesn't know the server's model
+    _, state = call(server, "/api/config", {"provider": "custom"})
+    assert state["config"]["base_url"] == "http://127.0.0.1:9/v1" and state["config"]["model"] == "my-whisper"
+    assert server.cfg.custom_server == {}
 
 
 def test_old_configs_keep_their_key(tmp_path):

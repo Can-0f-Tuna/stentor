@@ -29,7 +29,7 @@ class LiveTyper:
     FAST_STEPS = 6
     GAP = 3.7  # seconds between the rest
     AFTER_ERROR = 10  # seconds to wait after a failed request, such as the limit below
-    PER_MINUTE = 18  # Groq's free tier allows 20 a minute; this leaves room for the last pass
+    PER_MINUTE = 18  # speech services often allow 20 requests a minute; this leaves room for the last pass
     sent = deque()  # when requests went out, across recordings: dictating again must not break the limit
 
     def __init__(self, recorder, transcribe, clean, type_text, ready=lambda: True, gap: float = GAP, per_minute: int = PER_MINUTE,

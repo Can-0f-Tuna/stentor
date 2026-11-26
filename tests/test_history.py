@@ -224,7 +224,7 @@ def test_new_installs_keep_seven_days(tmp_path):
 
 def test_existing_users_stay_off_until_they_choose(tmp_path):
     p = tmp_path / "c.toml"
-    p.write_text('provider = "groq"\n')
+    p.write_text('provider = "openai"\n')
     assert config.load(p).history_days == 0
     config.save(config.load(p), p)
     assert config.load(p).history_days == 0  # also after any later save

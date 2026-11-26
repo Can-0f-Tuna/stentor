@@ -235,7 +235,7 @@ def test_review_transcript_can_ask_again_and_a_failed_request_is_not_hidden(add,
             assert (heard, sure) == ("en", -0.9)
             return again("he")[0]
     add(Review())
-    cfg = Config(provider="groq", api_key="k", languages="he,en")
+    cfg = Config(provider="openai", model="whisper-1", api_key="k", languages="he,en")
     assert transcribe_api(cfg, None) == "second"
 
     class Down:

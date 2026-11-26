@@ -7,9 +7,13 @@ Stentor is voice typing for the whole computer: hold Alt+Space, speak, let go, a
    - Windows (PowerShell): irm https://stentor-app.vercel.app/install.ps1 | iex
    The installer installs uv if it is missing, installs the latest release, starts Stentor now and at every login, and opens the settings page in my browser. If the stentor command is not found afterwards, open a new shell or add ~/.local/bin to PATH. Run stentor --version to confirm.
 
-2. API key. I do this part myself.
-   Tell me to open https://console.groq.com/keys, sign in, click Create API Key, paste the key into the settings page and click Check and save. Groq has a free tier. Don't ask me to paste the key into this chat, and never write it to a file, a command line or an issue. If the settings page didn't open, run: stentor settings
-   Wait until I say it's saved.
+2. Where my speech is transcribed. I do this part myself.
+   The settings page opens under Transcription > Where. Tell me the choices and let me pick:
+   - Stentor Cloud: the easiest, a paid subscription. I sign in and subscribe on the settings page; no key.
+   - This computer: free and offline. I press Install the offline engine on the settings page (or you run: stentor offline). It is a large download, and Stentor restarts when it is done.
+   - Your own key (advanced): OpenAI, or another OpenAI-compatible server. I paste the key into the settings page and click Check and save.
+   Don't ask me to paste a key into this chat, and never write it to a file, a command line or an issue. If the settings page didn't open, run: stentor settings
+   Wait until I say it's done.
 
 3. Check the setup
    Run: stentor doctor
@@ -42,9 +46,9 @@ Stentor is voice typing for the whole computer: hold Alt+Space, speak, let go, a
       - The full output of stentor doctor
       - The step that failed, the exact command, and its full output or error message
       - What you already tried
-      Remove the API key and anything else private before posting. Keys look like gsk_..., sk-... or any long random string. Never attach the config file itself.
+      Remove the API key and anything else private before posting. Keys look like sk-... or any long random string. Never attach the config file itself.
    c. Show me the issue text and post it once I agree: gh issue create --repo Can-0f-Tuna/stentor --title "<title>" --body-file <file>
       If gh is not installed or not signed in, give me this link to open instead, with the title and body URL-encoded: https://github.com/Can-0f-Tuna/stentor/issues/new?title=<title>&body=<body>
    d. Give me the link to the issue.
 
-7. When you are done, tell me in a few lines: what you installed and which version, what doctor says, whether both tests passed, and any issue you opened. Mention that settings (key, hotkey, languages, model, recording pill look) are in the Stentor icon next to the clock or in the menu bar, or by running stentor settings, and that updates install themselves.
+7. When you are done, tell me in a few lines: what you installed and which version, what doctor says, whether both tests passed, and any issue you opened. Mention that settings (where speech is transcribed, hotkey, languages, model, recording pill look) are in the Stentor icon next to the clock or in the menu bar, or by running stentor settings, and that updates install themselves.

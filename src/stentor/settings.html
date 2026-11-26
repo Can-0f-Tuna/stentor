@@ -563,10 +563,10 @@ function blocker(s) {
   }
   if (s.extension_transcribes) return null; // an extension takes the dictations, so no key or engine is needed
   if (c.provider === 'local') return s.local_installed ? null : s.offline.can_install
-    ? { title: 'Install the offline engine to start.', lede: 'It runs on this computer without internet. Run this in a terminal, then reload this page:', code: s.offline.command }
-    : { title: 'Install the offline engine to start.', lede: 'It runs on this computer without internet. It is a large download, a few hundred MB, and Stentor restarts when it is done.', button: offline.box };
+    ? { title: 'Install the offline model to start.', lede: 'Stentor turns your speech into text on this computer, free and without internet. It needs the offline engine first. Run this in a terminal, then reload this page:', code: s.offline.command }
+    : { title: 'Install the offline model to start.', lede: 'Stentor turns your speech into text on this computer, free and without internet. It needs the offline engine first: a large download, a few hundred MB, and Stentor restarts when it is done.', button: offline.box };
   if (c.provider === 'custom' && !c.base_url) return { title: 'Add your server\'s address to start.', lede: 'A custom service needs the address of any server that speaks the OpenAI transcription API.', move: 'customRows' };
-  if (!s.key_hint && !s.key_from_env) return { title: 'Paste an API key to start dictating.', lede: `Stentor sends what you say to a speech service, which turns it into text. You're set up for ${service}${c.provider === 'groq' ? ', which is free' : ''}. You can pick another service below.`, move: 'keyRows' };
+  if (!s.key_hint && !s.key_from_env) return { title: 'Paste an API key to start dictating.', lede: `With your own key, Stentor sends what you say to ${c.provider === 'custom' ? 'your speech server' : service}, which turns it into text. Or pick another place under Transcription.`, move: 'keyRows' };
   return null;
 }
 
@@ -658,10 +658,10 @@ function renderService(s) {
   const leaving = () => Object.assign({}, ...added.filter(p => p.on(s)).map(p => p.leave()));
   const clearKey = () => { $('key').value = ''; $('keyMsg').className = 'note'; $('keyMsg').textContent = ''; };
   const builtIn = [
-    { id: 'key', label: 'Your own key', hint: 'Your recordings go straight to a speech service you have a key for. Groq\'s is free.',
-      pick: () => ({ provider: c.provider !== 'local' ? c.provider : s.key_service || 'groq' }) },
-    { id: 'local', label: 'This computer', hint: 'Nothing leaves this computer and it works without internet. Slower, and a large download.',
+    { id: 'local', label: 'This computer', hint: 'Free, and nothing leaves this computer: it works without internet. Slower, and a large download the first time.',
       pick: () => ({ provider: 'local' }) },
+    { id: 'key', label: 'Your own key', hint: 'Advanced: your recordings go straight to OpenAI, or to another OpenAI-compatible server, with an API key of your own.',
+      pick: () => ({ provider: c.provider !== 'local' ? c.provider : s.key_service || 'openai' }) },
   ];
   keepFocus(seg, () => { seg.innerHTML = '';
   for (const p of [...added, ...builtIn]) {
@@ -683,7 +683,7 @@ function renderService(s) {
   for (const [k, v] of Object.entries(s.providers)) {
     const b = document.createElement('button');
     b.type = 'button'; b.dataset.k = k; b.textContent = v.label.replace(/ \(.*/, ''); b.setAttribute('aria-pressed', String(c.provider === k));
-    b.onclick = () => { if (c.provider === k) return; clearKey(); save({ provider: k, ...(k === 'groq' || k === 'openai' ? { model: '' } : {}) }); };
+    b.onclick = () => { if (c.provider === k) return; clearKey(); save({ provider: k, ...(k === 'openai' ? { model: '' } : {}) }); };
     prov.append(b);
   } });
   const local = c.provider === 'local', p = s.providers[c.provider];
@@ -698,7 +698,7 @@ function renderService(s) {
   const help = $('keyHelp'); help.textContent = '';
   if (p && p.keys_url) {
     const a = document.createElement('a'); a.href = p.keys_url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = new URL(p.keys_url).host;
-    help.append(c.provider === 'groq' ? 'Get a free key at ' : 'Get a key at ', a, '. Sign in, create a key, copy it and paste it here. It stays on this computer.');
+    help.append('Get a key at ', a, '. Sign in, create a key, copy it and paste it here. It stays on this computer.');
   }
   renderModel(s);
 }

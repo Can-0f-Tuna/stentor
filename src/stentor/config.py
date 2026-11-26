@@ -85,19 +85,9 @@ LANGUAGE_NAMES = {code: name for code, name, _ in LANGUAGES}
 
 # Cloud providers that speak the OpenAI audio-transcription API.
 PROVIDERS = {
-    "groq": {
-        "label": "Groq",
-        "base_url": "https://api.groq.com/openai/v1",
-        "model": "whisper-large-v3",
-        "models": [
-            ["whisper-large-v3", "Most accurate, best for Hebrew and mixed languages"],
-            ["whisper-large-v3-turbo", "Faster and cheaper, a little less accurate"],
-        ],
-        "keys_url": "https://console.groq.com/keys",
-        "env": "GROQ_API_KEY",
-    },
     "openai": {
         "label": "OpenAI",
+        "name": "OpenAI",  # in sentences
         "base_url": "https://api.openai.com/v1",
         "model": "gpt-4o-transcribe",
         "models": [
@@ -109,7 +99,8 @@ PROVIDERS = {
         "env": "OPENAI_API_KEY",
     },
     "custom": {
-        "label": "Custom (any OpenAI-compatible server)",
+        "label": "Another server (OpenAI-compatible)",
+        "name": "your speech server",
         "base_url": "",
         "model": "whisper-1",
         "models": [],  # any name the server knows, typed in by hand
@@ -117,6 +108,11 @@ PROVIDERS = {
         "env": "STENTOR_API_KEY",
     },
 }
+
+
+# Stentor 0.10 and older had a "groq" preset, and it was the default. A config that used it becomes a "custom" server with
+# the same address and model, and its key (or GROQ_API_KEY) keeps working: see migrate_groq.
+OLD_GROQ = {"base_url": "https://api.groq.com/openai/v1", "model": "whisper-large-v3", "env": "GROQ_API_KEY"}
 
 
 # Models for provider = "local" (faster-whisper). The first one is what Automatic uses.
@@ -189,10 +185,11 @@ DEFAULT_HOTKEY = "ctrl+alt+space" if sys.platform.startswith("linux") else "alt+
 
 @dataclass
 class Config:
-    provider: str = "groq"  # groq | openai | custom | local
+    provider: str = "local"  # local | openai | custom; an old "groq" is migrated (migrate_groq)
     api_key: str = ""
-    api_key_service: str = ""  # the provider the key was saved for; a Groq key means nothing to OpenAI
+    api_key_service: str = ""  # the provider the key was saved for; one service's key means nothing to another
     base_url: str = ""  # only for provider = "custom"; overrides the preset otherwise
+    custom_server: dict = field(default_factory=dict)  # base_url and model of the custom server while another service is picked
     model: str = ""  # empty = Automatic: the provider's recommended model
     languages: str = ""  # the languages you speak, comma-separated codes such as "he,en"; empty = any language
     prompt: str = ""  # optional spelling hint: words and names the transcriber should spell your way
@@ -227,6 +224,9 @@ class Config:
     post_hook: str = ""  # shell command: gets the text on stdin, its output is pasted; exit 77 pastes nothing
     extra: dict = field(default_factory=dict)  # keys of the file this version doesn't know: extensions own them, and they stay
 
+    def __post_init__(self):
+        migrate_groq(self)
+
     def setting(self, name: str, default):
         """A setting from `extra`, or `default` when it is missing or a text stands where a table should be."""
         value = self.extra.get(name, default)
@@ -235,12 +235,19 @@ class Config:
     def preset(self) -> dict:
         return PROVIDERS.get(self.provider, PROVIDERS["custom"])
 
+    def service_name(self, start: bool = False) -> str:
+        """The service in a sentence; `start` capitalises it for the start of one."""
+        name = self.preset()["name"]
+        return name[0].upper() + name[1:] if start else name
+
     def saved_key(self) -> str:
         """The key from the config file, if it was saved for the provider in use."""
         return self.api_key if self.api_key_service in ("", self.provider) else ""
 
     def effective_key(self) -> str:
-        return self.saved_key() or os.environ.get(self.preset()["env"], "") or env("API_KEY")
+        # A server migrated from the old Groq preset still takes GROQ_API_KEY, as it did before the custom one.
+        old = os.environ.get(OLD_GROQ["env"], "") if self.provider == "custom" and self.effective_base_url() == OLD_GROQ["base_url"] else ""
+        return self.saved_key() or old or os.environ.get(self.preset()["env"], "") or env("API_KEY")
 
     def effective_base_url(self) -> str:
         return (self.base_url or self.preset()["base_url"]).rstrip("/")
@@ -277,9 +284,35 @@ def load(path: Path | None = None) -> Config:
             cfg.beeps = bool(data["sounds"]) and not pill_available()
         if "history_days" not in data:
             cfg.history_days = 0.0  # a config from before there was a history: never start keeping text unasked
+        if "provider" not in data and (cfg.api_key or _old_env_key()):
+            cfg.provider = "groq"  # a file without a provider relied on the old default, Groq
         if cfg.api_key and "api_key_service" not in data:
             cfg.api_key_service = cfg.provider  # before 0.5 the key always belonged to the saved provider
+    elif _old_env_key():
+        # No file, a key in the environment: the old default, Groq, took that key, so it keeps doing so.
+        cfg.provider = "groq"
+    migrate_groq(cfg)
     return cfg
+
+
+def _old_env_key() -> bool:
+    """A key in the environment that the old default service, Groq, would have used."""
+    return bool(os.environ.get(OLD_GROQ["env"]) or env("API_KEY"))
+
+
+def migrate_groq(cfg: Config):
+    """The Groq preset is gone: a config that used it becomes a custom server with Groq's address, and with
+    Groq's model where it was on Automatic. A key saved for Groq is the custom server's key from then on, also while
+    another service is picked, so going back to Your own key finds it."""
+    if cfg.provider == "groq":
+        cfg.provider = "custom"
+        cfg.base_url = cfg.base_url or OLD_GROQ["base_url"]
+        cfg.model = cfg.model or OLD_GROQ["model"]
+        if cfg.api_key_service in ("", "groq"):
+            cfg.api_key_service = "custom" if cfg.api_key else ""
+    elif cfg.api_key_service == "groq" and cfg.provider != "custom":  # on another custom server the Groq key stays unused
+        cfg.api_key_service = "custom"
+        cfg.custom_server = cfg.custom_server or {"base_url": OLD_GROQ["base_url"], "model": OLD_GROQ["model"]}
 
 
 def migrate_language(cfg: Config, data: dict):

@@ -31,18 +31,26 @@ def cmd_setup(args) -> int:
     print("\nStentor setup\n")
     if args.provider:
         choice = args.provider
+        if choice == "groq":  # the old preset, still accepted from scripts: Groq's address as another server
+            choice = "custom"
+            if not (cfg.provider == "custom" and cfg.effective_base_url() == cfgmod.OLD_GROQ["base_url"]):
+                cfg.provider, cfg.base_url, cfg.model = "custom", cfgmod.OLD_GROQ["base_url"], cfgmod.OLD_GROQ["model"]
     else:
-        print("Which speech-to-text service should it use?")
-        print("  1) Groq    - recommended: very fast, accurate Whisper large-v3, has a free tier")
-        print("  2) OpenAI  - paid, good accuracy")
-        print("  3) Other   - any OpenAI-compatible server (your own, Together, Fireworks, ...)")
-        print("  4) Local   - offline on this computer, no account, but slower and a big download")
-        choice = {"1": "groq", "2": "openai", "3": "custom", "4": "local"}.get(ask("Choose", "1"), "groq")
+        print("Where should your speech be turned into text?")
+        print("  1) This computer - free and offline, no account or key; slower, and a large download")
+        print("  2) OpenAI        - your own OpenAI API key, paid by use")
+        print("  3) Another server - your own key for any OpenAI-compatible server")
+        choice = {"1": "local", "2": "openai", "3": "custom"}.get(ask("Choose", "1"), "local")
+    if cfg.provider == "custom" and choice != "custom":  # as the settings page does: the server is kept for later
+        cfg.custom_server, cfg.base_url, cfg.model = {"base_url": cfg.base_url, "model": cfg.model}, "", ""
+    elif choice == "custom" and cfg.provider != "custom" and cfg.custom_server and not cfg.base_url:
+        cfg.base_url, cfg.model = cfg.custom_server.get("base_url", ""), cfg.custom_server.get("model", "")
+        cfg.custom_server = {}
     cfg.provider = choice
 
     if choice == "local":
         if importlib.util.find_spec("faster_whisper") is None:
-            print(f"\nLocal mode needs the offline engine. Run:\n    {OFFLINE_COMMAND}\nthen run `stentor setup` again.")
+            print(f"\nThis computer needs the offline engine. Run:\n    {OFFLINE_COMMAND}\nthen run `stentor setup` again.")
             return 1
         cfg.local_model = ask("Model (tiny, base, small, medium, large-v3-turbo, or a Hugging Face repo)", cfg.local_model)
     else:
@@ -53,7 +61,7 @@ def cmd_setup(args) -> int:
         key = args.api_key
         if not key:
             if preset["keys_url"]:
-                print(f"\nYou need a {preset['label']} API key. To get one:")
+                print(f"\nYou need an {preset['name']} API key. To get one:")
                 print(f"  1. Open {preset['keys_url']}")
                 print("  2. Sign in (or create a free account)")
                 print("  3. Click 'Create API Key' and copy it")
@@ -226,7 +234,7 @@ def cmd_offline(_args) -> int:
     """Installs the offline engine the way an update installs: the latest release again, with the `local` extra,
     on the Python this copy runs on. A running Stentor does it and restarts; else this command does."""
     if importlib.util.find_spec("faster_whisper"):
-        print("The offline engine is already installed. Choose Offline in the settings to use it.")
+        print("The offline engine is already installed. Choose This computer under Transcription in the settings to use it.")
         return 0
     try:
         state = _daemon("/api/offline/install")
@@ -248,11 +256,11 @@ def cmd_offline(_args) -> int:
         return 1
     if sys.platform == "win32":  # this command's own files are locked while it runs: a helper installs after it exits
         import subprocess
-        subprocess.Popen(["powershell", "-NoProfile", "-Command", updater.windows_helper(start=False) + "; Write-Host 'Done. Choose Offline in the settings.'; pause"],
+        subprocess.Popen(["powershell", "-NoProfile", "-Command", updater.windows_helper(start=False) + "; Write-Host 'Done. Choose This computer in the settings.'; pause"],
                          creationflags=0x00000010, close_fds=True)  # CREATE_NEW_CONSOLE: you see it finish
         print("It installs in a new window once this one is done. Stentor can start after that.")
         return 0
-    print("\nThe offline engine is installed. Choose Offline in the settings to use it.")
+    print("\nThe offline engine is installed. Choose This computer under Transcription in the settings to use it.")
     return 0
 
 
@@ -279,7 +287,7 @@ def _follow_offline(state: dict) -> int:
             continue
         if gone or state["local_installed"] and not state["offline"]["ready"]:  # back after the restart
             if state["local_installed"]:
-                print("The offline engine is installed. Choose Offline in the settings to use it.")
+                print("The offline engine is installed. Choose This computer under Transcription in the settings to use it.")
                 return 0
             print(f"It didn't install: {state['offline']['status'] or 'Stentor restarted without it.'}")
             return 1
@@ -340,7 +348,7 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="command")
     sub.add_parser("run", help="start dictating (default)").set_defaults(fn=cmd_run)
     s = sub.add_parser("setup", help="guided setup in the terminal")
-    s.add_argument("--provider", choices=["groq", "openai", "custom", "local"])
+    s.add_argument("--provider", choices=["local", "openai", "custom", "groq"], metavar="{local,openai,custom}")
     s.add_argument("--api-key")
     s.add_argument("--base-url")
     s.add_argument("--model")

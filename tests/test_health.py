@@ -14,7 +14,7 @@ def row(rows, text):
 
 
 def test_the_page_shows_what_doctor_finds_with_a_plain_fix(server, capsys):  # noqa: F811
-    config.save(Config(hotkey="space"))  # no key saved, and a shortcut with no modifier
+    config.save(Config(provider="openai", hotkey="space"))  # no key saved, and a shortcut with no modifier
     code, report = call(server, "/api/health")
     assert code == 200 and report["ok"] is False
     assert all(r["ok"] or r["fix"] for r in report["checks"])
@@ -102,9 +102,19 @@ def test_doctor_in_a_terminal_asks_the_running_app_for_its_permissions(server, m
 
 
 def test_no_key_is_asked_for_when_a_plan_transcribes(monkeypatch):
-    """Signed in to a Stentor plan, its cloud transcribes; doctor asked for a Groq key anyway."""
+    """Signed in to a Stentor plan, its cloud transcribes; doctor asked for a key of your own anyway."""
     from stentor import extensions
-    cfg = Config()
+    cfg = Config(provider="openai")
     assert any("API key" in r["text"] for r in health.checks(cfg, online=False))
     monkeypatch.setattr(extensions, "transcribes", lambda cfg: True)
     assert not any("API key" in r["text"] for r in health.checks(cfg, online=False))
+
+
+def test_a_new_install_on_stentor_cloud_is_not_asked_for_the_offline_engine(monkeypatch):
+    """A new install stays on This computer; while Stentor Cloud transcribes, the offline engine is only a fallback."""
+    from stentor import extensions
+    from stentor.providers import LocalTranscriber
+    monkeypatch.setattr(LocalTranscriber, "available", staticmethod(lambda: False))
+    assert any(r["text"] == "local model library" and not r["ok"] for r in health.checks(Config(), online=False))
+    monkeypatch.setattr(extensions, "transcribes", lambda cfg: True)
+    assert not any(r["text"] == "local model library" for r in health.checks(Config(), online=False))

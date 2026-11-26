@@ -4,6 +4,12 @@ Hold **Alt+Space** (**Ctrl+Alt+Space** on Linux), speak, let go. The text is typ
 
 Works on **Windows, macOS and Linux** (Wayland and X11). Handles mixed-language speech, for example Hebrew with English words.
 
+The app is free and open source, under the MIT license. Your speech can be turned into text in three places:
+
+- **Stentor Cloud**, our paid service: the easiest way. Sign in, subscribe and dictate; no key, nothing to install.
+- **This computer**: free and offline. Nothing leaves your computer, and no account is needed.
+- **Your own key** (advanced): OpenAI, or any server that speaks the OpenAI transcription API, with your own API key.
+
 ## Install
 
 macOS / Linux (Terminal):
@@ -18,9 +24,9 @@ Windows (PowerShell):
 irm https://stentor-app.vercel.app/install.ps1 | iex
 ```
 
-The script installs [uv](https://docs.astral.sh/uv/), the system helpers it needs and the latest release of Stentor, starts it (and at every login), then opens the settings page in your browser. Sign in there with Google (a free account, once per computer), then add your API key. Running the script again reinstalls the latest release.
+The script installs [uv](https://docs.astral.sh/uv/), the system helpers it needs and the latest release of Stentor, starts it (and at every login), then opens the settings page in your browser. Under **Transcription**, choose where your speech goes: Stentor Cloud (sign in and subscribe), This computer (installs the offline engine, free), or Your own key. A new install starts on This computer, so it works without an account. Running the script again reinstalls the latest release.
 
-With an AI coding agent (Claude Code, Codex, Cursor, ...): paste the prompt from [install/agent.md](install/agent.md), also at <https://stentor-app.vercel.app/agent.md>. The agent installs it, walks you through the key, runs the checks and opens a GitHub issue for anything it can't fix.
+With an AI coding agent (Claude Code, Codex, Cursor, ...): paste the prompt from [install/agent.md](install/agent.md), also at <https://stentor-app.vercel.app/agent.md>. The agent installs it, helps you choose where your speech is transcribed, runs the checks and opens a GitHub issue for anything it can't fix.
 
 Manual install: `uv tool install --python 3.13 git+https://github.com/Can-0f-Tuna/stentor`, then `stentor service install` and `stentor settings`.
 
@@ -28,7 +34,7 @@ Manual install: `uv tool install --python 3.13 git+https://github.com/Can-0f-Tun
 
 A local page at `http://127.0.0.1:47811` that only this computer can open. Open it from the tray icon next to the clock (Windows), the menu-bar icon (macOS), **Stentor settings** in the app menu (Linux), or `stentor settings`. It sets:
 
-- speech service and API key (with a check that the key works)
+- where your speech is turned into text: Stentor Cloud, this computer, or a service you have a key for (with a check that the key works)
 - the model: Automatic uses the one we recommend for that service; **Choose another** lets you pick one
 - the languages you speak (pick as many as you like, for example Hebrew and English), the hotkey (press the keys to record it), and how it works: **hold** to talk (the default), **tap or hold** (a quick tap starts, the next tap stops; holding longer works like hold) or **tap to start and stop**. In the tap modes it can stop by itself after a few seconds of quiet
 - **Paste last dictation** records a shortcut to paste your last dictation again. It starts off disabled. Pick a different shortcut from those used to record.
@@ -66,16 +72,16 @@ The Release workflow runs the tests and publishes the GitHub release as a pre-re
 
 Stentor was called hold-dictate until version 0.10. A hold-dictate install does not update itself to Stentor: run the install command above once. It installs Stentor, copies your settings, history and sign-in out of the old folder (which stays where it is), takes away the old start-at-login entry, and removes the old `hold-dictate` tool. Variables you set as `HOLD_DICTATE_*` are still read.
 
-## Speech-to-text providers
+## Where your speech is transcribed
 
-| Provider | Cost | Notes |
+| Choice | Cost | Notes |
 | --- | --- | --- |
-| **Groq** (recommended) | free tier | Whisper large-v3, about 1 s. Key: <https://console.groq.com/keys> |
-| OpenAI | paid | Key: <https://platform.openai.com/api-keys> |
-| Custom | varies | Any server with an OpenAI-style `/audio/transcriptions` endpoint |
-| Local | free | Offline via faster-whisper. Install with `stentor offline`, or the button on the settings page |
+| **Stentor Cloud** (recommended) | paid subscription | The easiest way: sign in on the settings page and subscribe. No key, nothing to install |
+| **This computer** | free | Offline via faster-whisper. Install the engine with `stentor offline`, or the button on the settings page; the first use downloads the model |
+| OpenAI (own key) | paid by use | Key: <https://platform.openai.com/api-keys> |
+| Another server (own key) | varies | Any server with an OpenAI-style `/audio/transcriptions` endpoint: give its address, model and key |
 
-Getting a Groq key: open the link above, sign in, click **Create API Key**, copy it and paste it into the settings page. The key is stored in your user config file (permissions 600 on Linux and macOS). It leaves your computer only in requests to the provider. Free-tier limits change; see Groq's rate-limit page.
+A key is stored in your user config file (permissions 600 on Linux and macOS). It leaves your computer only in requests to the service it is for.
 
 If the cloud request fails and the `local` extra is installed, it falls back to the local model.
 
@@ -95,7 +101,7 @@ If the cloud request fails and the `local` extra is installed, it falls back to 
 | `stentor copy-last` | Copies the last dictation to the clipboard (also in the tray menu) |
 | `stentor config` | Prints the config file path |
 
-Settings live in a TOML file: `~/.config/stentor/config.toml` (Linux), `~/Library/Application Support/stentor/config.toml` (macOS), `%APPDATA%\stentor\config.toml` (Windows). Options: `provider`, `api_key`, `base_url`, `model`, `languages` (comma-separated codes such as `"he,en"`; empty means any language), `prompt`, `hotkey`, `paste_last_hotkey` (for example `ctrl+alt+v`, empty = off, the default), `hotkey_mode` (`hold`, `auto` or `toggle`), `silence_stop` (seconds, 0 = off), `live_text`, `local_model`, `local_fallback`, `beeps`, `background_audio` (`lower`, `mute` or `off`), `min_hold`, `timeout`, `auto_update`, `desktop_indicator` (the pill on macOS and Windows), `overlay_style`, `overlay_bg`, `overlay_bars`, `overlay_position`, `overlay_size`, `drop_hallucinations`, `remove_fillers`, `filler_words` (comma-separated, empty = built-in), `spoken_punctuation`, `word_overrides` (a table: `{ "get hub" = "GitHub" }`), `history_days` (0 = off), `auto_submit`, `app_rules` (a table: `{ "slack" = "submit", "keepassxc" = "off" }`; values `paste`, `submit`, `shift`, `clipboard`, `off`; a name matches part of the app name), and `post_hook`.
+Settings live in a TOML file: `~/.config/stentor/config.toml` (Linux), `~/Library/Application Support/stentor/config.toml` (macOS), `%APPDATA%\stentor\config.toml` (Windows). Options: `provider` (`local`, the default, `openai` or `custom`), `api_key`, `base_url` (for `custom`), `model`, `languages` (comma-separated codes such as `"he,en"`; empty means any language), `prompt`, `hotkey`, `paste_last_hotkey` (for example `ctrl+alt+v`, empty = off, the default), `hotkey_mode` (`hold`, `auto` or `toggle`), `silence_stop` (seconds, 0 = off), `live_text`, `local_model`, `local_fallback`, `beeps`, `background_audio` (`lower`, `mute` or `off`), `min_hold`, `timeout`, `auto_update`, `desktop_indicator` (the pill on macOS and Windows), `overlay_style`, `overlay_bg`, `overlay_bars`, `overlay_position`, `overlay_size`, `drop_hallucinations`, `remove_fillers`, `filler_words` (comma-separated, empty = built-in), `spoken_punctuation`, `word_overrides` (a table: `{ "get hub" = "GitHub" }`), `history_days` (0 = off), `auto_submit`, `app_rules` (a table: `{ "slack" = "submit", "keepassxc" = "off" }`; values `paste`, `submit`, `shift`, `clipboard`, `off`; a name matches part of the app name), and `post_hook`.
 
 The app is told apart by its window class on X11, Hyprland, Sway and niri, by its name on macOS and its program name on Windows. GNOME and KDE on Wayland do not say which window is focused, so per-app rules do not apply there.
 
@@ -111,13 +117,13 @@ After you let go, the microphone stays on for 200 ms, because the last word ofte
 
 ## Status
 
-Pre-release. Tested end to end on Linux (Wayland, PipeWire) with a mock provider and the local model. The Windows and macOS code paths are unit-tested and run in CI, but the hotkey hooks, permissions and paste have not yet been tried on real machines of those systems. A live call to Groq or OpenAI has not been tested with this version either. The tray icon (Windows, macOS) and self-update on Windows have not been tried on a real machine yet.
+Pre-release. Tested end to end on Linux (Wayland, PipeWire) with a mock provider and the local model. The Windows and macOS code paths are unit-tested and run in CI, but the hotkey hooks, permissions and paste have not yet been tried on real machines of those systems. A live call to OpenAI has not been tested with this version either. The tray icon (Windows, macOS) and self-update on Windows have not been tried on a real machine yet.
 
 The recording pill on macOS was run on one Intel Mac VM (macOS 26): the app, its hotkey and paste into TextEdit, with the microphone and the speech service faked; the no-microphone error was real. Focus stayed in TextEdit and clicks went through. Apple silicon, several displays, full-screen apps and a real microphone are untested. On Windows the pill has never run on a real machine.
 
 ## What is open source
 
-This repository is the app itself, under the MIT license (see [LICENSE](LICENSE)), plus the install scripts in `install/`. It works completely on its own: no account, and nothing is sent anywhere but the speech service you pick. The website is a separate, closed project. Other packages can add to the app through the `stentor.extensions` entry point group; `src/stentor/extensions.py` lists what they can do.
+This repository is the app itself, under the MIT license (see [LICENSE](LICENSE)), plus the install scripts in `install/`. It works completely on its own: no account, and nothing is sent anywhere but the speech service you pick. Stentor Cloud is our paid service; its server is a separate, closed project, as is the website. Other packages can add to the app through the `stentor.extensions` entry point group; `src/stentor/extensions.py` lists what they can do.
 
 ## Develop
 

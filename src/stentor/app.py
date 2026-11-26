@@ -6,7 +6,7 @@ import time
 
 from . import audio, extensions, history, paste, textproc
 from .ducking import Ducker
-from .config import Config
+from .config import OFFLINE_COMMAND, Config
 from .feedback import Feedback
 from .hotkey import HoldDetector, choose_backend, parse_hotkey, parse_paste_last_hotkey
 from .live import LiveTyper
@@ -163,6 +163,14 @@ class Dictation:
             return
         if self.cfg.provider != "local" and not self.cfg.effective_key() and not extensions.transcribes(self.cfg):
             self.fb.error("no API key yet. Add one in the settings.")
+            if self.on_no_key:
+                self.on_no_key()
+            return
+        if self.cfg.provider == "local" and not LocalTranscriber.available() and not extensions.transcribes(self.cfg):
+            # A new install starts on This computer: the first step is installing the offline model, which the
+            # settings page offers, not a recording that fails at the end.
+            self.fb.error(f"the offline model isn't installed yet. Install it in the settings, or run {OFFLINE_COMMAND}.",
+                          "Install the offline model in the settings to start dictating.")
             if self.on_no_key:
                 self.on_no_key()
             return
@@ -504,7 +512,7 @@ def run(cfg: Config) -> int:
     updater.announce = not feedback.events  # the pill ticks instead
 
     def on_saved(new_cfg: Config):
-        if new_cfg.provider == "local" and dictation.local.loaded != new_cfg.local_model and not extensions.transcribes(new_cfg):
+        if new_cfg.provider == "local" and dictation.local.loaded != new_cfg.local_model and not extensions.transcribes(new_cfg) and LocalTranscriber.available():
             dictation.local.preload()
         new_hotkey = parse_hotkey(new_cfg.hotkey)
         new_second = extensions.second_hotkey(new_cfg, new_hotkey)
@@ -528,7 +536,7 @@ def run(cfg: Config) -> int:
     server.paste_last_problem = paste_last_problem
     dictation.on_no_key = server.open
     extensions.started(dictation, server, detector)
-    if cfg.provider == "local" and not extensions.transcribes(cfg):
+    if cfg.provider == "local" and not extensions.transcribes(cfg) and LocalTranscriber.available():
         dictation.local.preload()  # after the extensions, which may pick the model; the first dictation shouldn't wait
     if sys.platform == "darwin":
         from . import macos

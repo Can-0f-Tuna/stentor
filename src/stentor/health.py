@@ -122,15 +122,17 @@ def checks(cfg, online: bool = True) -> list:
     if online:
         for row in extensions.doctor_lines():
             line(*row)
-    if cfg.provider == "local":
+    if cfg.provider == "local" and extensions.transcribes(cfg):
+        pass  # an extension transcribes (Stentor Cloud, or its own local model): the offline engine would only be its fallback
+    elif cfg.provider == "local":
         line(LocalTranscriber.available(), "local model library", f"Run this in a terminal: {OFFLINE_COMMAND}")
     elif not cfg.effective_key() and extensions.transcribes(cfg):
         pass  # an extension transcribes (a Stentor plan): a key of your own would only be its fallback
     elif online:
         problem = check_api(cfg)
-        line(not problem, f"{cfg.preset()['label']} API key", problem or "Run `stentor settings`.")
+        line(not problem, f"{cfg.service_name()} API key", problem or "Run `stentor settings`.")
     else:
-        line(bool(cfg.effective_key()), f"{cfg.preset()['label']} API key saved", "Paste your key under Transcription, then press Check and save.")
+        line(bool(cfg.effective_key()), f"{cfg.service_name()} API key saved", "Paste your key under Transcription, then press Check and save.")
     return rows
 
 

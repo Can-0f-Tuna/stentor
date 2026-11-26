@@ -43,7 +43,7 @@ FONTS = {"/fonts/geist.woff2": "geist-latin.woff2", "/fonts/geist-mono.woff2": "
 PORT = 47811
 SECRET_FIELDS = {"api_key"}
 HISTORY_ROWS = 200  # shown on the page at a time; search reaches the rest
-EDITABLE = {f.name for f in fields(Config)} - {"idle_unload_seconds", "api_key_service", "extra"}
+EDITABLE = {f.name for f in fields(Config)} - {"idle_unload_seconds", "api_key_service", "custom_server", "extra"}
 
 
 def runtime_file() -> Path:
@@ -185,6 +185,17 @@ class SettingsServer:
             setattr(new, name, cfgmod.coerce(name, value))
         if str(changes.get("api_key", "")).strip():
             new.api_key_service = new.provider
+        old = self.cfg
+        if old.provider == "custom" and new.provider != "custom" and "base_url" not in changes:
+            # Away from a custom server: its address would send the other service's requests there. It comes back with it.
+            new.custom_server, new.base_url = {"base_url": old.base_url, "model": old.model}, ""
+            if "model" not in changes:
+                new.model = ""  # the server's model name means nothing to another service
+        elif new.provider == "custom" and old.provider != "custom" and not new.base_url and new.custom_server:
+            new.base_url = str(new.custom_server.get("base_url", ""))
+            if "model" not in changes:
+                new.model = str(new.custom_server.get("model", ""))
+            new.custom_server = {}
         extensions.check_settings(new, changes)
         if new.provider not in (*PROVIDERS, "local"):
             raise ValueError("unknown provider")
@@ -238,7 +249,7 @@ class SettingsServer:
             return {"ok": ok, "message": "" if ok else f"Install the offline engine first: press Install, or run {OFFLINE_COMMAND} in a terminal."}
         problem = check_api(new)
         if " returned 401" in problem:
-            problem = f"{new.preset()['label']} didn't accept this key. Check that you copied all of it."
+            problem = f"{new.service_name(start=True)} didn't accept this key. Check that you copied all of it."
         return {"ok": not problem, "message": problem}
 
     def start_service(self) -> dict:

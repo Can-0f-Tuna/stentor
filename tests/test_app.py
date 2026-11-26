@@ -544,10 +544,23 @@ def test_a_press_after_the_local_model_was_freed_loads_it_while_you_speak(monkey
     from stentor.providers import LocalTranscriber
     loads = []
     monkeypatch.setattr(LocalTranscriber, "preload", lambda self: loads.append(1))
+    monkeypatch.setattr(LocalTranscriber, "available", staticmethod(lambda: True))
     d = Dictation(Config(provider="local", min_hold=9), FakeFeedback(), recorder_factory=FakeRecorder)
     d.begin()
     assert loads == [1]
     d.finish()
+
+
+def test_a_new_install_without_the_offline_model_asks_for_it_instead_of_recording(monkeypatch):
+    """Fresh installs start on This computer; before the offline model is installed, a press says what to do."""
+    from stentor.providers import LocalTranscriber
+    monkeypatch.setattr(LocalTranscriber, "available", staticmethod(lambda: False))
+    made, opened, fb = [], [], FakeFeedback()
+    d = Dictation(Config(), fb, recorder_factory=lambda on_level: made.append(1) or FakeRecorder(on_level))
+    d.on_no_key = lambda: opened.append(1)
+    d.begin()
+    assert made == [] and opened == [1]
+    assert fb.log == [("error", "Install the offline model in the settings to start dictating.")]
 
 
 def test_a_dictation_right_after_the_last_one_in_the_same_app_gets_a_space(api, monkeypatch):

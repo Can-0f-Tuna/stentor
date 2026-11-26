@@ -98,7 +98,7 @@ def device(monkeypatch):
 def session(device, **settings):
     """A Dictation that records through `device` and hands each clip to `clips` instead of a service."""
     fb, out, clips = Feedback(), Pasted(), []
-    cfg = Config(**{"api_key": "k", "min_hold": 0.1, "beeps": False, "background_audio": "off", **settings})
+    cfg = Config(**{"provider": "openai", "api_key": "k", "min_hold": 0.1, "beeps": False, "background_audio": "off", **settings})
     d = Dictation(cfg, fb, paster=out.paste, copier=out.copy, focus=lambda: "app", ducker=Duck(device.log))
     d.transcribe = lambda speech: (clips.append((time.monotonic(), speech)) or "words", "test")
     return d, fb, out, clips
