@@ -123,7 +123,13 @@ The recording pill on macOS was run on one Intel Mac VM (macOS 26): the app, its
 
 ## What is open source
 
-This repository is the app itself, under the MIT license (see [LICENSE](LICENSE)), plus the install scripts in `install/`. It works completely on its own: no account, and nothing is sent anywhere but the speech service you pick. Stentor Cloud is our paid service; its server is a separate, closed project, as is the website. Other packages can add to the app through the `stentor.extensions` entry point group; `src/stentor/extensions.py` lists what they can do.
+Everything that runs on your computer, under the MIT license (see [LICENSE](LICENSE)): the app in `src/stentor`, the package in `app/` that adds the account, the Stentor Cloud client and the local Hebrew and English models, and the install scripts in `install/`. The app works completely on its own: no account, and nothing is sent anywhere but the speech service you pick. Stentor Cloud is our paid service; its server is a separate, closed project, as is the website.
+
+## Repository layout
+
+- `src/stentor`, `tests/`: the app itself, the `stentor` package (`pyproject.toml` at the root).
+- `app/`: the `stentor-pro` package (`app/src/stentor_pro`, `app/tests`, its own `app/pyproject.toml`): the account and sign-in, the Stentor Cloud client, the clean-up and edit-by-voice client, the automatic local Hebrew and English models, the voice check (Silero VAD) and the opt-in recordings client. It plugs into the app through the `stentor.extensions` entry point group; `src/stentor/extensions.py` lists what an extension can do. Official installs bring both.
+- `install/`: the install scripts.
 
 ## Develop
 
@@ -132,3 +138,12 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```
+
+The `app/` package's tests, with the app from this checkout:
+
+```sh
+cd app
+uv run --no-project --with pytest --with-editable .. --with-editable . pytest -q tests
+```
+
+Install the core with `--with-editable ..` as above: with `--with ..`, uv may reuse a cached build of the core from before your last change, even with `--refresh-package stentor`.

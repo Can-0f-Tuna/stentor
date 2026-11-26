@@ -1,0 +1,235 @@
+import json
+import sys
+import threading
+import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import pytest
+
+from stentor.config import Config
+from stentor.settings_ui import SettingsServer
+from stentor_pro.account import Account
+
+
+class FakeSite:
+    """The Stentor site's account API: exchange, me and logout."""
+
+    def __init__(self):
+        self.requests = []
+        self.me_status, self.premium, self.plan = 200, False, "free"
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                outer.requests.append(("GET", self.path, self.headers.get("Authorization")))
+                if self.path == "/api/me":
+                    return self._reply(outer.me_status, {"email": "you@example.com", "name": "You", "premium": outer.premium, "plan": outer.plan})
+                self._reply(404, {})
+
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                outer.requests.append(("POST", self.path, self.headers.get("Authorization"), body))
+                if self.path == "/api/auth/exchange":
+                    if body.get("code") == "good-code":
+                        return self._reply(200, {"token": "new-token", "user": {"email": "you@example.com", "name": "You", "premium": True}})
+                    return self._reply(400, {"error": "code"})
+                self._reply(200, {"ok": True})
+
+            def _reply(self, status, payload):
+                data = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+
+@pytest.fixture
+def site():
+    fake = FakeSite()
+    yield fake
+    fake.server.shutdown()
+
+
+@pytest.fixture
+def signed_out(signed_in):
+    signed_in.unlink()
+
+
+def serve(site, pro):
+    pro.account = Account(site=site.url)
+    return SettingsServer(Config(api_key="gsk_secret1234"), port=0).start()
+
+
+def get(server, path, token=True):
+    request = urllib.request.Request(f"http://127.0.0.1:{server.port}{path}", headers={"X-Token": server.token} if token else {})
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a):
+            return None
+    try:
+        with urllib.request.build_opener(NoRedirect).open(request) as r:
+            return r.status, r.headers, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers, e.read()
+
+
+def post(server, path, body=None):
+    data = json.dumps(body or {}).encode()
+    request = urllib.request.Request(f"http://127.0.0.1:{server.port}{path}", data=data, headers={"X-Token": server.token, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request) as r:
+            return r.status, json.load(r)
+    except urllib.error.HTTPError as e:
+        return e.code, json.load(e)
+
+
+def test_signed_out_the_settings_work(site, pro, signed_out):
+    s = serve(site, pro)
+    try:
+        status, state = get(s, "/api/state")[0], json.loads(get(s, "/api/state")[2])
+        assert status == 200 and state["account"] is None
+        code, state = post(s, "/api/config", {"beeps": True})
+        assert code == 200 and state["config"]["beeps"] is True and state["account"] is None
+    finally:
+        s.stop()
+
+
+def test_sign_in_round_trip(site, pro, signed_out, signed_in):
+    s = serve(site, pro)
+    try:
+        url = post(s, "/api/account/signin")[1]["url"]
+        assert url.startswith(site.url + "/api/auth/start?to=app&port=" + str(s.port) + "&state=")
+        state = url.rsplit("state=", 1)[1]
+        status, headers, _ = get(s, f"/auth?code=good-code&state={state}", token=False)
+        assert status == 303 and headers["Location"] == f"/?t={s.token}"
+        saved = json.loads(signed_in.read_text())
+        assert saved["token"] == "new-token" and saved["premium"] is True
+        if sys.platform != "win32":
+            assert signed_in.stat().st_mode & 0o777 == 0o600
+        account = json.loads(get(s, "/api/state")[2])["account"]
+        assert account == {"email": "you@example.com", "name": "You", "premium": True,  # never the token
+                           "plan": "free", "cloud": None, "billing": None, "sale": False}
+        assert post(s, "/api/config", {"beeps": True})[0] == 200
+        # the same state can't be used twice
+        status, _, body = get(s, f"/auth?code=good-code&state={state}", token=False)
+        assert status == 400 and s.token.encode() not in body
+    finally:
+        s.stop()
+
+
+def test_a_sign_in_this_app_did_not_start_is_refused(site, pro, signed_out, signed_in):
+    s = serve(site, pro)
+    try:
+        status, headers, body = get(s, "/auth?code=good-code&state=made-up-state-123456", token=False)
+        assert status == 400 and "Location" not in headers and s.token.encode() not in body
+        assert not signed_in.exists()
+        assert not any(r[1] == "/api/auth/exchange" for r in site.requests)
+        # a bad code from the site leaves you signed out
+        state = post(s, "/api/account/signin")[1]["url"].rsplit("state=", 1)[1]
+        assert get(s, f"/auth?code=bad&state={state}", token=False)[0] == 400 and not signed_in.exists()
+    finally:
+        s.stop()
+
+
+def test_auth_needs_the_local_host_name(site, pro, signed_out):
+    s = serve(site, pro)
+    try:
+        request = urllib.request.Request(f"http://127.0.0.1:{s.port}/auth?code=good-code&state=x", headers={"Host": "evil.example:80"})
+        with pytest.raises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(request)
+        assert e.value.code == 403
+    finally:
+        s.stop()
+
+
+def test_check_follows_the_server(site, signed_in):
+    account = Account(site=site.url)
+    site.premium = True
+    assert account.check(max_age=0) and account.premium()
+    assert ("GET", "/api/me", "Bearer test-token") in site.requests
+    site.me_status = 503  # server trouble: keep what we know
+    assert account.check(max_age=0) and account.signed_in()
+    site.me_status = 401  # signed out or blocked on the server
+    assert not account.check(max_age=0) and not signed_in.exists()
+
+
+def test_check_keeps_the_account_offline(signed_in):
+    account = Account(site="http://127.0.0.1:9")  # nothing listens there
+    assert account.check(max_age=0, timeout=1) and account.signed_in()
+
+
+def test_sign_out_forgets_the_token_and_tells_the_server(site, pro, signed_in):
+    s = serve(site, pro)
+    try:
+        state = post(s, "/api/account/signout")[1]
+        assert state["account"] is None and not signed_in.exists()
+        assert any(r[:3] == ("POST", "/api/auth/logout", "Bearer test-token") for r in site.requests)
+    finally:
+        s.stop()
+
+
+def test_dictation_does_not_wait_for_a_sign_in(signed_out):
+    from stentor.app import Dictation
+
+    class Fb:
+        errors = []
+        def error(self, text, *a, **k): self.errors.append(text)
+        def __getattr__(self, name): return lambda *a, **k: None
+
+    opened = []
+    started = []
+    d = Dictation(Config(provider="openai", api_key="sk-secret1234"), Fb(), recorder_factory=lambda level: started.append(1),
+                  on_no_key=lambda: opened.append(1))
+    d.on_action("start")
+    assert started == [1] and not opened and Fb.errors == []
+
+
+def test_the_notice_waits_for_stentor_cloud_and_goes_after_the_click(site, signed_in):
+    account = Account(site=site.url)
+    account._write({"token": "tok", "premium": False, "checked": 0})
+    account.check(max_age=0)
+    assert not account.premium_notice()
+
+    site.premium = True  # the old Premium flag alone turns nothing on, so no notice says it did
+    account.check(max_age=0)
+    assert not account.premium_notice()
+
+    site.plan = "plus"
+    account.check(max_age=0)
+    assert account.premium_notice()
+    account.check(max_age=0)  # still waiting for the click
+    assert account.premium_notice()
+
+    account.premium_notice_seen()
+    account.check(max_age=0)
+    assert not account.premium_notice()
+
+
+def test_no_notice_when_the_subscription_ends_first(site, signed_in):
+    account = Account(site=site.url)
+    account._write({"token": "tok", "premium": False, "checked": 0})
+    site.plan = "plus"
+    account.check(max_age=0)
+    site.plan = "free"
+    account.check(max_age=0)
+    assert not account.premium_notice()
+
+
+def test_a_subscriber_from_before_the_round_sees_the_notice_once_more(site, signed_in):
+    account = Account(site=site.url)
+    account._write({"token": "tok", "plan": "plus", "premium_notice": False, "checked": 0})
+    assert account.premium_notice()
+    account.premium_notice_seen()
+    assert not account.premium_notice()
+
+    account._write({"token": "tok", "premium": True, "premium_notice": False, "checked": 0})  # Premium alone: no
+    assert not account.premium_notice()

@@ -1,0 +1,129 @@
+<style>
+.start-choice { display: flex; flex-direction: column; gap: var(--s-3); align-items: flex-start; }
+.start-choice .cmd { align-self: stretch; }
+.start-choice .offline { align-self: stretch; }
+.tag { display:inline-flex; align-items:center; flex:none; height:22px; padding:0 var(--s-2); border-radius:var(--r-pill); font-size:var(--t-xs); font-weight:500; white-space:nowrap;
+  color:var(--accent); background:color-mix(in srgb, var(--accent) 9%, transparent); border:1px solid color-mix(in srgb, var(--accent) 28%, transparent); }
+.tag.soft { color:var(--muted); background:var(--soft); border-color:var(--line); }
+/* The Stentor Cloud features: the controls show only with a subscription; the shortcut uses the hero's keycaps, smaller */
+#premGroup:not(.on) .prem-on { display:none; }
+#premGroup.on .tag.prem { display:none; }
+.keys.mini { font-size:30px; gap:var(--s-2) var(--s-3); min-height:31px; }
+.keys.mini .cap { margin-bottom:3px; border-radius:var(--r-md);
+  box-shadow:inset 0 1px 0 var(--key-hi), 0 3px 0 -1px var(--key-shade), 0 3px 0 0 var(--key-edge), 0 14px 20px -14px var(--key-glow); }
+.keys.mini .cap.down { transform:translateY(2px); box-shadow:inset 0 1px 0 var(--key-hi), 0 1px 0 -1px var(--key-shade), 0 1px 0 0 var(--key-edge), 0 8px 12px -10px var(--key-glow); }
+.keys.mini .word { font-size:var(--t-base); font-weight:400; color:var(--muted); letter-spacing:0; }
+/* The controls opening after the "Stentor Cloud is on" notice */
+.arrows { display:inline-flex; flex:none; gap:1px; margin-inline-end:var(--s-2); align-self:center; }
+.arrows i { width:9px; height:9px; border-block-start:2.5px solid var(--accent); border-inline-end:2.5px solid var(--accent); transform:rotate(45deg); }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes prem-open { from { opacity:0; transform:translateY(18px) scale(.96); } 60% { opacity:1; transform:translateY(-3px) scale(1.01); } to { opacity:1; transform:none; } }
+  @keyframes prem-pop { from { transform:scale(.4); } 60% { transform:scale(1.2); } to { transform:scale(1); } }
+  @keyframes prem-ring { from { box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } to { box-shadow:0 0 0 14px transparent; } }
+  @keyframes prem-arrow { 0%, 100% { opacity:.2; } 40% { opacity:1; } }
+  @keyframes prem-nudge { 0%, 100% { translate:0; } 50% { translate:5px; } }
+  .reveal .items > * { animation:prem-open .55s cubic-bezier(.2,.8,.2,1) backwards; }
+  .reveal .items > :nth-child(2) { animation-delay:.1s; }
+  .reveal .items > :nth-child(3) { animation-delay:.3s; }
+  .reveal .items > :nth-child(4) { animation-delay:.5s; }
+  .reveal .try { animation:prem-pop .45s cubic-bezier(.2,.8,.2,1) .55s backwards, prem-ring 1.3s ease-out 1s 5; }
+  .arrows { animation:prem-nudge .9s ease-in-out infinite; }
+  .arrows i { animation:prem-arrow .9s linear infinite; }
+  .arrows i:nth-child(2) { animation-delay:.15s; }
+  .arrows i:nth-child(3) { animation-delay:.3s; }
+}
+.learned { gap:0; max-height:320px; overflow:auto; border-top:1px solid var(--line); }
+.learned .pair { min-height:40px; border-bottom:1px solid var(--line); padding-inline-start:var(--s-1); }
+.learned .pair > span { min-width:0; overflow-wrap:anywhere; }
+.learned .pair > span:nth-last-child(2) { flex:1; } /* the last word takes the room, so the × sits at the end */
+/* The sharing question: at the top of the page until it's answered */
+.sharing-card { display:grid; gap:var(--s-2); margin-top:var(--s-6); padding:var(--s-5); border:1px solid var(--line-2); border-radius:var(--r-lg, 14px); }
+.sharing-card h2 { margin:0; font-size:var(--t-md); font-weight:600; letter-spacing:-.01em; }
+.sharing-card .answers { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); margin-top:var(--s-2); max-width:360px; }
+.sharing-card .answers .btn { width:100%; }
+/* Stentor Cloud: what it includes, and the one way in from here (sign in, subscribe, or manage) */
+.perks { margin:0; padding-inline-start:var(--s-5); display:grid; gap:var(--s-1); color:var(--muted); font-size:var(--t-sm); }
+.seg button .rec { margin-inline-start:var(--s-2); font-size:var(--t-xs); font-weight:500; color:var(--accent); }
+.seg button[aria-pressed=true] .rec { color:inherit; opacity:.7; }
+/* This month's cloud time as a thin bar */
+.meter { height:6px; border-radius:var(--r-pill); background:var(--soft); overflow:hidden; margin-top:var(--s-2); }
+.meter i { display:block; height:100%; width:0; background:var(--accent); border-radius:inherit; transition:width .3s ease; }
+.meter.full i { background:var(--err); }
+#usageText { font-variant-numeric:tabular-nums; }
+</style>
+
+<div class="item" id="cloudPanel">
+  <div class="item" id="usageBox">
+    <span class="label" id="l-usage">Cloud transcription this month</span>
+    <div class="meter" id="usageMeter" role="progressbar" aria-labelledby="l-usage" aria-valuemin="0"><i id="usageBar"></i></div>
+    <p class="hint" id="usageText"></p>
+  </div>
+  <p class="hint" id="cloudBackup"></p>
+</div>
+
+<section class="group" id="planGroup" aria-labelledby="h-plan">
+  <header><h2 id="h-plan">Stentor Cloud</h2><p id="planLine"></p></header>
+  <div class="items">
+    <ul class="perks" id="planPerks">
+      <li>No API key, nothing to install</li>
+      <li>Our most accurate transcription</li>
+      <li>Clean up what you said</li>
+      <li>Edit by voice, and translate what you select</li>
+      <li>A dictionary that learns your words</li>
+    </ul>
+    <div class="row" id="planRow"><span class="text"><b id="planName"></b><span class="hint" id="planBill"></span></span><button class="btn small" id="planBtn"></button></div>
+    <span class="note" id="planMsg"></span>
+  </div>
+</section>
+
+<section class="group" id="premGroup" aria-labelledby="h-prem">
+  <header><h2 id="h-prem">Clean-up and edit by voice</h2><p id="premLine"></p></header>
+  <div class="items">
+    <div class="item">
+      <div class="row"><span class="text"><b>Edit by voice</b><span class="hint">Select text, hold the shortcut and say what to change, like “make it shorter” or “in English”.</span></span><span class="tag prem"></span></div>
+      <div class="item prem-on" id="editBox">
+        <div class="keys mini" id="editKeys" aria-label="Edit by voice shortcut"></div>
+        <div class="acts-start"><button class="btn small" id="recEdit">Change</button><button class="link" id="editOff" aria-label="Turn off the edit-by-voice shortcut">Turn off</button><span class="note" id="editMsg"></span></div>
+      </div>
+    </div>
+    <label class="row"><span class="text"><b>Clean up what you said</b><span class="hint">Drops the “uh”s and “like”s, keeps only what you settled on when you correct yourself, writes English words like <bdi>גיטהאב</bdi> as GitHub, adds punctuation, and fits the app: a short message in chat, sentences in email, steps as a list for an AI assistant. The text, the app’s name and its window title go through the Stentor server to a language model. If it takes too long, the text comes as heard. Choosing As you speak turns this off.</span></span><span class="tag prem"></span><input type="checkbox" class="switch prem-on" id="plus_clean"></label>
+    <div class="item prem-on" id="cleanBox">
+      <div class="row"><label class="text" for="clean_model"><b>Clean-up model</b><span class="hint">The language model that cleans up your text.</span></label><select id="clean_model" class="more"></select></div>
+      <p class="hint" id="cleanLast" aria-live="polite"></p>
+    </div>
+    <div class="item">
+      <label class="row"><span class="text"><b>A dictionary that learns</b><span class="hint">When you fix a word it typed, Stentor learns how you spell it. Nothing to type in by hand.</span></span><span class="tag prem"></span><input type="checkbox" class="switch prem-on" id="premium_learn"></label>
+      <div class="item prem-on" id="learnBox">
+        <span class="label" id="l-learned">Learned so far</span>
+        <div class="pairs learned" id="learnRows" role="list" aria-labelledby="l-learned"></div>
+        <p class="hint" id="learnEmpty">Nothing yet. It learns from what you dictate and from the words you correct and copy.</p>
+        <div><button class="link" id="forget">Forget everything</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sharing-card" id="sharingCard" aria-labelledby="h-card" hidden>
+  <h2 id="h-card">Help improve accuracy?</h2>
+  <p class="hint">Save your recordings and their text on our servers to train our models. Change it anytime in Settings.</p>
+  <div><a class="link" id="cardInfo" target="_blank" rel="noopener">What we collect</a></div>
+  <div class="answers"><button class="btn" id="cardNo">No thanks</button><button class="btn" id="cardYes">Yes, help</button></div>
+  <span class="note" id="cardMsg"></span>
+</section>
+
+<section class="group" id="sharingGroup" aria-labelledby="h-sharing" hidden>
+  <header><h2 id="h-sharing">Help improve accuracy</h2><p>Your dictation works the same either way.</p></header>
+  <div class="items">
+    <label class="row"><span class="text"><b>Share recordings</b><span class="hint">Save your recordings and their text on our servers to train our models. Never from offline mode, your own server, edit by voice, or an app set to Do nothing or Copy only. <a class="link" id="sharingInfo" target="_blank" rel="noopener">What we collect</a></span></span><input type="checkbox" class="switch" id="sharingOn"></label>
+    <div class="row"><span class="text"><b>Delete my data</b><span class="hint">Turning sharing off stops new recordings and keeps what you already shared, unless you press this. Deleting removes it all and turns sharing off.</span></span><button class="btn small" id="sharingDelete">Delete my data</button></div>
+    <span class="note" id="sharingMsg"></span>
+  </div>
+</section>
+
+<section class="group" id="acctGroup" aria-labelledby="h-acct">
+  <header><h2 id="h-acct">Account</h2><p>Your Stentor account.</p></header>
+  <div class="items">
+    <div class="row"><span class="text"><b id="acctName"></b><span class="hint" id="acctMail"></span></span><button class="btn small" id="signOut">Sign out</button></div>
+    <p class="hint">Signing out turns Stentor Cloud off on this computer. Dictation goes on with This computer or your own key.</p>
+  </div>
+</section>
